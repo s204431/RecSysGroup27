@@ -14,6 +14,11 @@ Copy the pubic key and insert it into GitHub
 cat ~/.ssh/id_rsa.pub
 ```
 
+Clone this repo
+```bash
+git@github.com:s204431/RecSysGroup27.git
+```
+
 Run the following command when you want to activate the enviroment
 ```bash
 eval "$(ssh-agent -s)"
