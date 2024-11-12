@@ -53,20 +53,25 @@ def create_glove_tokenizer(vocabulary):
     tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
     return tokenizer
 
-def embed_sentence(sentence):
+def embed_sentence(sentence, tokenizer, embeddings):
     """Tokenizes and embeds a sentence"""
-    encoding = glove_tokenizer.encode(sentence, add_special_tokens=False)
+    encoding = tokenizer.encode(sentence, add_special_tokens=False)
     token_ids = encoding.ids
-    vectors = [glove_vectors[t] for t in token_ids]
+    vectors = [embeddings(torch.tensor(t)) for t in token_ids]
     return encoding, token_ids, vectors
 
 
 glove_vocabulary, glove_vectors = load_glove_vectors()
 glove_tokenizer = create_glove_tokenizer(glove_vocabulary)
 
+# Instantiate enbeddings layer using GloVe vectors
+embeddings = nn.Embedding(*glove_vectors.shape)
+embeddings.weight.data = glove_vectors
+embeddings.weight.requires_grad = False     # Freeze if you don't want to train further
+
 # Tokenize and embed sentence
 sentence = "This makes a little more sense now!"
-encoding, token_ids, vectors = embed_sentence(sentence)
+encoding, token_ids, vectors = embed_sentence(sentence, glove_tokenizer, embeddings)
 
 # Report (+ example of how to decode token ids)
 rich.print(f"glove_vocabulary: type={type(glove_vocabulary)}, length={len(glove_vocabulary)}\n")
