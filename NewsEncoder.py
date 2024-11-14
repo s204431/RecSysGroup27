@@ -71,7 +71,7 @@ embeddings.weight.data = glove_vectors
 embeddings.weight.requires_grad = False     # Freeze if you don't want to train further (they do this in week 5)
 
 # Tokenize and embed sentence
-sentence = "This makes a little more sense now!"
+sentence = "This makes a little more sense now! Maybe not"
 encoding, token_ids, vectors = embed_sentence(sentence, glove_tokenizer, embeddings)
 
 # Report
@@ -90,7 +90,6 @@ for t,v in zip(token_ids, vectors):
 
 
 """ATTEMPT TO PLOT ATTENTION BETWEEN EACH OF THE WORDS IN THE SENTENCE"""
-
 def attention(Q, K, V, tau=None):
     """A simple parallelized attention layer"""
     if tau is None:
@@ -137,3 +136,54 @@ H, attention_map = attention(vectors, vectors, vectors)
 # visualized the log of the attention map
 tokens = [glove_vocabulary[x] for x in token_ids]
 plot_attention_map(attention_map.log(), tokens, tokens, print_values=True)
+
+
+"""MULTI-HEADED SELF_ATTENTION"""
+def attention(query, key, value, mask=None, dropout=None):
+    "Compute 'Scaled Dot Product Attention'"
+    d_k = query.size(-1)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, -math.inf)
+    p_attn = nn.functional.softmax(scores, dim = -1)
+    if dropout is not None:
+        p_attn = dropout(p_attn)
+    return torch.matmul(p_attn, value), p_attn
+
+class MultiHeadedAttention(nn.Module):
+    """A simple Multi-head attention layer."""
+    def __init__(self, h, d_model, dropout=0.1):
+        "Take in model size and number of heads."
+        super(MultiHeadedAttention, self).__init__()
+        assert d_model % h == 0
+        # We assume d_v always equals d_k
+        self.d_k = d_model // h
+        self.h = h
+        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(4)])
+        self.attn = None # store the attention maps
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, query, key, value, mask=None):
+        nbatches = query.size(0)
+        if mask is not None:
+            # Same mask applied to all h heads.
+            mask = mask.unsqueeze(1)
+
+        # 1) Do all the linear projections in batch from d_model => h x d_k
+        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
+
+        # 2) Apply attention on all the projected vectors in batch.
+        x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
+
+        # 3) "Concat" using a view and apply a final linear.
+        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        return self.linears[-1](x)
+
+
+MHSA = MultiHeadedAttention(h=10, d_model=embeddings.embedding_dim, dropout=0.1)
+output = MHSA(vectors, vectors, vectors)
+
+rich.print(output.shape)
+rich.print(output)
+#rich.print(MHSA.attn.shape)
+#rich.print(MHSA.attn)
