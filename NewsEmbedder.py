@@ -1,0 +1,62 @@
+import torch
+from torch import nn
+import math
+from functools import partial
+from pathlib import Path
+from tqdm import tqdm
+import rich
+from typing import List, Tuple, Optional, Dict, Any
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import tokenizers
+import zipfile
+from huggingface_hub import hf_hub_download
+
+class NewsEmbedder(nn.Module):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Load the GloVe vectors
+        self.glove_vocabulary, self.glove_vectors = self.__load_glove_vectors()
+        self.glove_tokenizer = self.__create_glove_tokenizer()
+
+        # Instantiate enbeddings layer using GloVe vectors
+        self.embeddings = nn.Embedding(*self.glove_vectors.shape)
+        self.embeddings.weight.data = self.glove_vectors
+        #embeddings.weight.requires_grad = False    # Freeze embedding layer to disable backtracking (training)
+
+    def __load_glove_vectors(self, filename = "glove.6B.300d.txt") -> Tuple[List[str], torch.Tensor]:
+        """Load the GloVe vectors. See: `https://github.com/stanfordnlp/GloVe`"""
+        path = Path(hf_hub_download(repo_id="stanfordnlp/glove", filename="glove.6B.zip"))
+        target_file = path.parent / filename
+        if not target_file.exists():
+            with zipfile.ZipFile(path, 'r') as zip_ref:
+                zip_ref.extractall(path.parent)
+
+        # parse the vocabulary and the vectors
+        vocabulary = []
+        vectors = []
+        with open(target_file, "r", encoding="utf8") as f:
+            for l in tqdm(f.readlines(), desc=f"Parsing {target_file.name}..." ):
+                word, *vector = l.split()
+                vocabulary.append(word)
+                vectors.append(torch.tensor([float(v) for v in vector]))
+
+        vectors = torch.stack(vectors)
+        return vocabulary, vectors
+    
+    def __create_glove_tokenizer(self):
+        """Create tokenizer using GloVe vocabulary"""
+        tokenizer = tokenizers.Tokenizer(tokenizers.models.WordLevel(vocab={v:i for i,v in enumerate(self.glove_vocabulary)}, unk_token="<|unknown|>"))
+        tokenizer.normalizer = tokenizers.normalizers.BertNormalizer(strip_accents=False)
+        tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+        return tokenizer
+
+    def forward(self, string):
+        """Tokenizes and embeds a string"""
+        encoding = self.glove_tokenizer.encode(string, add_special_tokens=False)
+        token_ids = torch.tensor(encoding.ids)
+        vectors = self.embeddings(token_ids)
+        return vectors.unsqueeze(0)
