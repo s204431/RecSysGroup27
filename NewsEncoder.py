@@ -69,9 +69,11 @@ embeddings.weight.data = glove_vectors
 embeddings.weight.requires_grad = False     # Freeze if you don't want to train further (they do this in week 5)
 
 # Tokenize and embed sentence
-sentence = "This makes a little more sense now! Maybe not"
+sentence = "This makes a little more sense now!"
 encoding, token_ids, vectors = embed_sentence(sentence, glove_tokenizer, embeddings)
+vectors = vectors.unsqueeze(0)
 
+print(vectors.shape)
 # Report
 rich.print(f"glove_vocabulary: type={type(glove_vocabulary)}, length={len(glove_vocabulary)}\n")
 rich.print(f"glove_vectors: type={type(glove_vectors)}, shape={glove_vectors.shape}, dtype={glove_vectors.dtype}\n")
@@ -129,7 +131,7 @@ def plot_attention_map(attention_map, queries_labels, keys_labels, print_values:
     fig.tight_layout()
     plt.show()
 
-H, attention_map = attention(vectors, vectors, vectors)
+#H, attention_map = attention(vectors, vectors, vectors)
 
 # visualized the log of the attention map
 #tokens = [glove_vocabulary[x] for x in token_ids]
@@ -144,8 +146,7 @@ class MultiHeadedAttention(nn.Module):
         # We assume d_v always equals d_k
         self.d_k = d_model // h
         self.h = h
-        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(3)])
-        self.linears.append(nn.Linear(self.d_k, self.d_k))
+        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(4)])
         self.attn = None # store the attention maps
         self.dropout = nn.Dropout(p=dropout)
         self.q = nn.Parameter(torch.randn(size=(d_model,)))
@@ -163,24 +164,31 @@ class MultiHeadedAttention(nn.Module):
         return torch.matmul(p_attn, value), p_attn
 
     def attention2(self, h_vectors):
-        a = torch.matmul(self.q, torch.tanh(self.linears[-1](h_vectors)))
-        alpha = torch.softmax(a)
-        return torch.einsum("qk, kh -> qh", alpha, h_vectors) #Returns r
+        a = torch.matmul(torch.tanh(self.linears[-1](h_vectors)), self.q)
+        print(a.shape)
+        alpha = torch.softmax(a, dim=-1)
+        print("Dimensions before einsum: ", alpha.shape, h_vectors.shape)
+        return torch.einsum("bk,bkh->bh", alpha, h_vectors)  #Returns r
     
     def forward(self, query, key, value, mask=None):
         nbatches = query.size(0)
+        print("Batches: ", nbatches)
         if mask is not None:
             # Same mask applied to all h heads.
             mask = mask.unsqueeze(1)
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
+        print("1: ", query.shape, key.shape, value.shape)
         query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
+        print("2: ", query.shape, key.shape, value.shape)
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = self.attention(query, key, value, mask=mask, dropout=self.dropout)
+        print("3: ", x.shape)
 
         # 3) "Concat" using a view and apply a final linear.
-        #x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        print("4: ", x.shape)
         #return self.linears[-1](x)
         return self.attention2(x)
 
