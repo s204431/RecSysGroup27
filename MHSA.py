@@ -18,17 +18,18 @@ from NewsEmbedder import NewsEmbedder
 
 class MultiHeadedAttention(nn.Module):
     """A simple Multi-head attention layer."""
-    def __init__(self, h, d_model, dropout=0.1):
+    def __init__(self, h, d_model, d_model_out, dropout=0.1):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
-        assert d_model % h == 0
+        assert d_model_out % h == 0
         # We assume d_v always equals d_k
-        self.d_k = d_model // h
+        self.d_k = d_model_out // h
         self.h = h
-        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(4)])
+        self.linears = nn.ModuleList([nn.Linear(d_model, d_model_out) for _ in range(3)])
+        self.linears.append(nn.Linear(d_model_out, d_model_out))
         self.attn = None # store the attention maps
         self.dropout = nn.Dropout(p=dropout)
-        self.q = nn.Parameter(torch.randn(size=(d_model,)))
+        self.q = nn.Parameter(torch.randn(size=(d_model_out,)))
 
     """MULTI-HEADED SELF_ATTENTION"""
     def attention(self, query, key, value, mask=None, dropout=None):
