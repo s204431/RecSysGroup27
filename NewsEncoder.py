@@ -1,4 +1,4 @@
-#pip install ipywidgets rich seaborn torch datasets transformers tokenizers sentencepiece sacremoses --quiet
+#pip install ipywidgets rich seaborn torch tokenizers sentencepiece sacremoses --quiet
 
 import torch
 from torch import nn
@@ -11,9 +11,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-import transformers
 import tokenizers
-import datasets
 import zipfile
 from huggingface_hub import hf_hub_download
 
@@ -134,21 +132,8 @@ def plot_attention_map(attention_map, queries_labels, keys_labels, print_values:
 H, attention_map = attention(vectors, vectors, vectors)
 
 # visualized the log of the attention map
-tokens = [glove_vocabulary[x] for x in token_ids]
-plot_attention_map(attention_map.log(), tokens, tokens, print_values=True)
-
-
-"""MULTI-HEADED SELF_ATTENTION"""
-def attention(query, key, value, mask=None, dropout=None):
-    "Compute 'Scaled Dot Product Attention'"
-    d_k = query.size(-1)
-    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, -math.inf)
-    p_attn = nn.functional.softmax(scores, dim = -1)
-    if dropout is not None:
-        p_attn = dropout(p_attn)
-    return torch.matmul(p_attn, value), p_attn
+#tokens = [glove_vocabulary[x] for x in token_ids]
+#plot_attention_map(attention_map.log(), tokens, tokens, print_values=True)
 
 class MultiHeadedAttention(nn.Module):
     """A simple Multi-head attention layer."""
@@ -159,10 +144,29 @@ class MultiHeadedAttention(nn.Module):
         # We assume d_v always equals d_k
         self.d_k = d_model // h
         self.h = h
-        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(4)])
+        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(3)])
+        self.linears.append(nn.Linear(self.d_k, self.d_k))
         self.attn = None # store the attention maps
         self.dropout = nn.Dropout(p=dropout)
+        self.q = nn.Parameter(torch.randn(size=(d_model,)))
 
+    """MULTI-HEADED SELF_ATTENTION"""
+    def attention(self, query, key, value, mask=None, dropout=None):
+        "Compute 'Scaled Dot Product Attention'"
+        d_k = query.size(-1)
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -math.inf)
+        p_attn = nn.functional.softmax(scores, dim = -1)
+        if dropout is not None:
+            p_attn = dropout(p_attn)
+        return torch.matmul(p_attn, value), p_attn
+
+    def attention2(self, h_vectors):
+        a = torch.matmul(self.q, torch.tanh(self.linears[-1](h_vectors)))
+        alpha = torch.softmax(a)
+        return torch.einsum("qk, kh -> qh", alpha, h_vectors) #Returns r
+    
     def forward(self, query, key, value, mask=None):
         nbatches = query.size(0)
         if mask is not None:
@@ -173,11 +177,12 @@ class MultiHeadedAttention(nn.Module):
         query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
 
         # 2) Apply attention on all the projected vectors in batch.
-        x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
+        x, self.attn = self.attention(query, key, value, mask=mask, dropout=self.dropout)
 
         # 3) "Concat" using a view and apply a final linear.
-        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
-        return self.linears[-1](x)
+        #x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        #return self.linears[-1](x)
+        return self.attention2(x)
 
 
 MHSA = MultiHeadedAttention(h=10, d_model=embeddings.embedding_dim, dropout=0.1)
