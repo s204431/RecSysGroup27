@@ -2,18 +2,8 @@
 
 import torch
 from torch import nn
-import math
-from functools import partial
-from pathlib import Path
-from tqdm import tqdm
 import rich
-from typing import List, Tuple, Optional, Dict, Any
-import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
-import tokenizers
-import zipfile
-from huggingface_hub import hf_hub_download
 from MHSA import MultiHeadedAttention
 from NewsEncoder import NewsEncoder
 
@@ -33,17 +23,23 @@ class UserEncoder(nn.Module):
         self.news_encoder = NewsEncoder(d_model_out=self.d_model_out, h=self.h, dropout=self.dropout)
         self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0)
 
-    def forward(self, history, target):
+    def forward(self, history, targets):
         encoded_history = torch.stack([self.news_encoder(title).squeeze() for title in history], 0).unsqueeze(0)
-        r = self.news_encoder(target)
+
         print("Encoded history shape", encoded_history.shape)
         u = self.MHSA(encoded_history, encoded_history, encoded_history)
-        return torch.dot(u.squeeze(), r.squeeze())
+
+        predictions = []
+        for i in range(len(targets)):
+            r = self.news_encoder(targets[i])  
+            predictions.append(torch.dot(u.squeeze(), r.squeeze()))  
+        return torch.stack(predictions)
+
 
 history = ["This a test", "This is the click history"]
-target = "I hope this works!"
+target = ["I hope this works!", "with multiple targets"]
 user_encoder = UserEncoder(h=16, dropout=0.2)
-output = user_encoder(history=history, target=target)
+output = user_encoder(history=history, targets=target)
 
 rich.print(output.shape)
 rich.print(output)
