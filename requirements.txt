@@ -1,3 +1,14 @@
-numpy
 torch
-torchvision
+tqdm
+rich
+matplotlib
+seaborn
+numpy
+tokenizers
+huggingface_hub
+polars
+pandas
+rich
+tokenizers
+pyarrow
+fastparquet
