@@ -2,11 +2,13 @@ import torch
 import pandas as pd
 import random
 import numpy as np
+import math
 
 
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from UserEncoder import UserEncoder
+from torch import nn
 
 def flatten(lst):
     flattened_list = []
@@ -28,7 +30,7 @@ def find_position(row):
 
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, K = 4):
-        PATH = Path(__file__).parent.resolve().joinpath("../ebnerd_data")
+        PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
         df_history   = pd.read_parquet(PATH.joinpath(DATASET, "train", "history.parquet"))
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, "train", "behaviors.parquet"))
@@ -88,7 +90,7 @@ class ArticlesDatasetTraining(Dataset):
         
         self.df_data['article_ids_inview'] = self.df_data['article_ids_inview'].apply(replace_ids_with_titles)
         self.df_data['article_ids_clicked'] = self.df_data['article_ids_clicked'].apply(replace_ids_with_titles)
-        self.df_data['article_ids_inview'] = self.df_data['article_ids_inview'].apply(replace_ids_with_titles)
+        self.df_data['article_ids_fixed'] = self.df_data['article_ids_fixed'].apply(replace_ids_with_titles)
 
 
     def __len__(self):
@@ -102,16 +104,50 @@ class ArticlesDatasetTraining(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['article_ids_inview'], row['article_ids_clicked'], row['gt_position']
+        return row['article_ids_fixed'], row['article_ids_inview'], row['article_ids_clicked'], row['gt_position']
 
-dataset = ArticlesDatasetTraining('ebnerd_demo')
-train_loader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=list)
+def getLastN(lst, N):
+    if len(lst) < N:
+        return lst
+    else:
+        return lst[-N:]
+
+def accuracy(outputs, targets):
+    nCorrect = 0
+    for i in range(0, len(outputs)):
+        pred = torch.argmax(outputs[i])
+        if pred == targets[i]:
+            nCorrect += 1
+    return nCorrect/len(targets)
+
+dataset = ArticlesDatasetTraining('ebnerd_demo', K=1)
+train_loader = DataLoader(dataset, batch_size=64, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=16, dropout=0.2)
 
+optimizer = torch.optim.Adam(user_encoder.parameters(), lr=1e-3)
+criterion = nn.CrossEntropyLoss()
 num_epochs = 1
-for batch in train_loader:
-    for history, targets, gt_position in batch:
-        print(history)
-        print(targets)
-        output = user_encoder(history=history, targets=targets)
-        break
+user_encoder.train()
+for i in range(0, num_epochs):
+    accuracies = []
+    for batch in train_loader:
+        batch_outputs = []
+        batch_targets = []
+        for history, sample, target, gt_position in batch:
+            if math.isnan(gt_position):
+                continue
+            history = getLastN(history, 10)
+            print(len(history), len(sample), len(target), gt_position)
+            output = user_encoder(history=history, targets=sample)
+            batch_outputs.append(output)
+            batch_targets.append(torch.tensor(int(gt_position)))
+        loss = criterion(torch.stack(batch_outputs), torch.stack(batch_targets))
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        acc = accuracy(batch_outputs, batch_targets)
+        accuracies.append(acc)
+        print("Loss: ", float(loss.data.numpy()))
+        print("Accuracy: ", acc)
+        print("Average accuracy so far: ", sum(accuracies)/len(accuracies))
+    break

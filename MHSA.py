@@ -45,29 +45,29 @@ class MultiHeadedAttention(nn.Module):
 
     def attention2(self, h_vectors):
         a = torch.matmul(torch.tanh(self.linears[-1](h_vectors)), self.q)
-        print(a.shape)
+        #print(a.shape)
         alpha = torch.softmax(a, dim=-1)
-        print("Dimensions before einsum: ", alpha.shape, h_vectors.shape)
+        #print("Dimensions before einsum: ", alpha.shape, h_vectors.shape)
         return torch.einsum("bk,bkh->bh", alpha, h_vectors)  #Returns r
     
     def forward(self, query, key, value, mask=None):
         nbatches = query.size(0)
-        print("Batches: ", nbatches)
+        #print("Batches: ", nbatches)
         if mask is not None:
             # Same mask applied to all h heads.
             mask = mask.unsqueeze(1)
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
-        print("1: ", query.shape, key.shape, value.shape)
+        #print("1: ", query.shape, key.shape, value.shape)
         query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
-        print("2: ", query.shape, key.shape, value.shape)
+        #print("2: ", query.shape, key.shape, value.shape)
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = self.attention(query, key, value, mask=mask, dropout=self.dropout)
-        print("3: ", x.shape)
+        #print("3: ", x.shape)
 
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
-        print("4: ", x.shape)
+        #print("4: ", x.shape)
         #return self.linears[-1](x)
         return self.attention2(x)
