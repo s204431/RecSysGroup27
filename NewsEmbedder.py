@@ -12,6 +12,7 @@ import numpy as np
 import tokenizers
 import zipfile
 from huggingface_hub import hf_hub_download
+import random
 
 class NewsEmbedder(nn.Module):
 
@@ -44,19 +45,21 @@ class NewsEmbedder(nn.Module):
                 vocabulary.append(word)
                 vectors.append(torch.tensor([float(v) for v in vector]))
 
+        vocabulary.append("[UNK]")
+        vectors.append(torch.tensor([random.uniform(-1, 1) for i in range(0, 300)]))
         vectors = torch.stack(vectors)
         return vocabulary, vectors
     
     def __create_glove_tokenizer(self):
         """Create tokenizer using GloVe vocabulary"""
-        tokenizer = tokenizers.Tokenizer(tokenizers.models.WordLevel(vocab={v:i for i,v in enumerate(self.glove_vocabulary)}, unk_token="<|unknown|>"))
+        tokenizer = tokenizers.Tokenizer(tokenizers.models.WordLevel(vocab={v:i for i,v in enumerate(self.glove_vocabulary)}, unk_token="[UNK]"))
         tokenizer.normalizer = tokenizers.normalizers.BertNormalizer(strip_accents=False)
         tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
         return tokenizer
 
     def forward(self, string):
         """Tokenizes and embeds a string"""
-        encoding = self.glove_tokenizer.encode(string, add_special_tokens=False)
+        encoding = self.glove_tokenizer.encode(string, add_special_tokens=True)
         token_ids = torch.tensor(encoding.ids)
         vectors = self.embeddings(token_ids)
         return vectors.unsqueeze(0)
