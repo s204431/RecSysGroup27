@@ -26,7 +26,7 @@ class UserEncoder(nn.Module):
     def forward(self, history, targets):
         encoded_history = torch.stack([self.news_encoder(title).squeeze() for title in history], 0).unsqueeze(0)
 
-        print("Encoded history shape", encoded_history.shape)
+        #print("Encoded history shape", encoded_history.shape)
         u = self.MHSA(encoded_history, encoded_history, encoded_history)
 
         predictions = []
@@ -36,10 +36,10 @@ class UserEncoder(nn.Module):
         return torch.stack(predictions)
 
 
-history = ["This a test", "This is the click history"]
-target = ["I hope this works!", "with multiple targets"]
-user_encoder = UserEncoder(h=16, dropout=0.2)
-output = user_encoder(history=history, targets=target)
+#history = ["This a test", "This is the click history"]
+#target = ["I hope this works!", "with multiple targets"]
+#user_encoder = UserEncoder(h=16, dropout=0.2)
+#output = user_encoder(history=history, targets=target)
 
-rich.print(output.shape)
-rich.print(output)
+#rich.print(output.shape)
+#rich.print(output)

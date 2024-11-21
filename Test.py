@@ -15,7 +15,7 @@ from ebrec.utils._constants import *
 from ebrec.utils._python import compute_npratio
 
 if __name__ == '__main__':
-    PATH = Path(__file__).parent.resolve().joinpath("../ebnerd_data")
+    PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     print(PATH)
     TRAIN_VAL_SPLIT = f"ebnerd_demo"  # [ebnerd_demo, ebnerd_small, ebnerd_large]
     TEST_SPLIT = f"ebnerd_testset"
