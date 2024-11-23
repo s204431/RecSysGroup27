@@ -31,9 +31,9 @@ class UserEncoder(nn.Module):
 
         predictions = []
         for i in range(len(targets)):
-            r = self.news_encoder(targets[i])  
-            predictions.append(torch.dot(u.squeeze(), r.squeeze()))  
-        return torch.stack(predictions)
+            r = self.news_encoder(targets[i])
+            predictions.append(torch.dot(u.squeeze(), r.squeeze()))
+        return nn.LogSoftmax(dim=0)(torch.stack(predictions))
 
 
 #history = ["This a test", "This is the click history"]
