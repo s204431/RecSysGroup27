@@ -4,7 +4,6 @@ import random
 import numpy as np
 import math
 import matplotlib.pyplot as plt
-from Dataloader import NRMSDataLoader
 
 
 from pathlib import Path
@@ -33,13 +32,11 @@ def find_position(row):
 
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, type, K = 4): #Type is "train" or "validation"
-        start = time.time()
         PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
         df_history   = pd.read_parquet(PATH.joinpath(DATASET, type, "history.parquet"))
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type, "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
-        print("Time to read files: ", time.time() - start)
         self.df_data = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked']].copy()
 
         article_ids_fixed_list = []
@@ -49,7 +46,6 @@ class ArticlesDatasetTraining(Dataset):
             article_ids_fixed_for_user = df_history[df_history['user_id'] == user_id]['article_id_fixed'].tolist()
             article_ids_fixed_list.append(article_ids_fixed_for_user)
         
-        print("Time: ", time.time() - start)
         self.df_data['article_ids_fixed'] = article_ids_fixed_list
         self.df_data['article_ids_fixed'] = self.df_data['article_ids_fixed'].apply(lambda x: np.concatenate(x).tolist() if isinstance(x, list) else x)
 
@@ -59,7 +55,6 @@ class ArticlesDatasetTraining(Dataset):
             remaining_articles = article_ids_fixed.difference(article_ids_clicked)
             self.df_data.at[index, 'article_ids_fixed'] = list(remaining_articles)
 
-        print("Time after second for loop: ", time.time() - start)
         for index, row in self.df_data.iterrows():
             article_ids_inview = row['article_ids_inview']
             article_ids_clicked = row['article_ids_clicked']
@@ -89,7 +84,6 @@ class ArticlesDatasetTraining(Dataset):
             random.shuffle(flattened_list)
             self.df_data.at[index, 'article_ids_inview'] = flattened_list
 
-        print("Time after third for loop: ", time.time() - start)
         self.df_data['gt_position'] = self.df_data.apply(find_position, axis=1)
         self.article_dict = pd.Series(df_articles['title'].values, index=df_articles['article_id']).to_dict()
 
@@ -99,7 +93,6 @@ class ArticlesDatasetTraining(Dataset):
         self.df_data['article_ids_inview'] = self.df_data['article_ids_inview'].apply(replace_ids_with_titles)
         self.df_data['article_ids_clicked'] = self.df_data['article_ids_clicked'].apply(replace_ids_with_titles)
         self.df_data['article_ids_fixed'] = self.df_data['article_ids_fixed'].apply(replace_ids_with_titles)
-        print("Final time: ", time.time() - start)
 
 
     def __len__(self):
@@ -137,10 +130,10 @@ h = 16
 dropout = 0.2
 
 learning_rate = 1e-3
-num_epochs = 10
+num_epochs = 100
 
 validate_every = 50
-validation_size = 1000
+validation_size = 2000
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train', K=k)
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', K=k)
