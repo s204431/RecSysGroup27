@@ -186,7 +186,8 @@ for i in range(0, num_epochs):
         print("Batch accuracy: ", acc)
         print("Batch auc: ", aucscore)
         print("Average accuracy so far in epoch: ", sum(accuracies)/len(accuracies))
-        print("Average auc score so far in epoch: ", sum(aucs)/len(aucs))
+        if len(aucs) > 0:
+            print("Average auc score so far in epoch: ", sum(aucs)/len(aucs))
         print()
         if n_batches_finished % validate_every == 0:
             break
@@ -204,7 +205,6 @@ for i in range(0, num_epochs):
         output = user_encoder(history=history, targets=sample)
         batch_outputs.append(output)
         batch_targets.append(torch.tensor(int(gt_position)))
-        validation_index += 1
     batch_outputs = torch.stack(batch_outputs)
     batch_targets = torch.stack(batch_targets)
     loss = criterion(batch_outputs, batch_targets)
@@ -221,7 +221,8 @@ for i in range(0, num_epochs):
     validation_losses.append(loss.data.numpy())
     train_accuracies.append(sum(accuracies)/len(accuracies))
     validation_accuracies.append(acc)
-    train_aucs.append(sum(aucs)/len(aucs))
+    if len(aucs) > 0:
+        train_aucs.append(sum(aucs)/len(aucs))
     validation_aucs.append(aucscore)
     user_encoder.train()
 
