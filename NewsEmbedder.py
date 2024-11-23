@@ -26,8 +26,9 @@ class NewsEmbedder(nn.Module):
         # Instantiate enbeddings layer using GloVe vectors
         self.embeddings = nn.Embedding(*self.glove_vectors.shape)
         self.embeddings.weight.data = self.glove_vectors
-        #embeddings.weight.requires_grad = False    # Freeze embedding layer to disable backtracking (training)
+        self.embeddings.weight.requires_grad = False    # Freeze embedding layer to disable backtracking (training)
 
+    #(glove.6B.300d.txt, glove.6B.zip), (glove.42B.300d.txt, glove.42B.300d.zip), (glove.840B.300d.txt, glove.840B.300d.zip)
     def __load_glove_vectors(self, filename = "glove.6B.300d.txt") -> Tuple[List[str], torch.Tensor]:
         """Load the GloVe vectors. See: `https://github.com/stanfordnlp/GloVe`"""
         path = Path(hf_hub_download(repo_id="stanfordnlp/glove", filename="glove.6B.zip"))
