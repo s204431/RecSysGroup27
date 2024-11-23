@@ -10,7 +10,7 @@ from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from UserEncoder import UserEncoder
 from torch import nn
-import time
+from sklearn.metrics import roc_auc_score
 
 def flatten(lst):
     flattened_list = []
@@ -116,9 +116,9 @@ def getLastN(lst, N):
 
 def accuracy(outputs, targets):
     nCorrect = 0
-    for i in range(0, len(outputs)):
+    for i in range(0, len(targets)):
         pred = torch.argmax(outputs[i])
-        if pred == targets[i]:
+        if pred == targets.data.numpy()[i]:
             nCorrect += 1
     return nCorrect/len(targets)
 
@@ -147,11 +147,14 @@ train_losses = []
 validation_losses = []
 train_accuracies = []
 validation_accuracies = []
+train_aucs = []
+validation_aucs = []
 for i in range(0, num_epochs):
     n_batches_finished = 0
     validation_index = 0
     accuracies = []
     losses = []
+    aucs = []
     for batch in train_loader:
         batch_outputs = []
         batch_targets = []
@@ -163,18 +166,27 @@ for i in range(0, num_epochs):
             output = user_encoder(history=history, targets=sample)
             batch_outputs.append(output)
             batch_targets.append(torch.tensor(int(gt_position)))
-        loss = criterion(torch.stack(batch_outputs), torch.stack(batch_targets))
+        batch_outputs = torch.stack(batch_outputs)
+        batch_targets = torch.stack(batch_targets)
+        loss = criterion(batch_outputs, batch_targets)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         acc = accuracy(batch_outputs, batch_targets)
         accuracies.append(acc)
+        if len(np.unique(batch_targets.data.numpy())) == k+1:
+            aucscore = roc_auc_score(batch_targets.data.numpy(), torch.softmax(batch_outputs, dim=1).data.numpy(), multi_class='ovr')
+            aucs.append(aucscore)
+        else:
+            aucscore = None
         losses.append(loss.data.numpy())
         n_batches_finished += 1
         print("Number of batches finished: ", n_batches_finished)
         print("Batch loss: ", float(loss.data.numpy()))
         print("Batch accuracy: ", acc)
+        print("Batch auc: ", aucscore)
         print("Average accuracy so far in epoch: ", sum(accuracies)/len(accuracies))
+        print("Average auc score so far in epoch: ", sum(aucs)/len(aucs))
         print()
         if n_batches_finished % validate_every == 0:
             break
@@ -193,18 +205,28 @@ for i in range(0, num_epochs):
         batch_outputs.append(output)
         batch_targets.append(torch.tensor(int(gt_position)))
         validation_index += 1
-    loss = criterion(torch.stack(batch_outputs), torch.stack(batch_targets))
+    batch_outputs = torch.stack(batch_outputs)
+    batch_targets = torch.stack(batch_targets)
+    loss = criterion(batch_outputs, batch_targets)
     acc = accuracy(batch_outputs, batch_targets)
+    if len(np.unique(batch_targets.data.numpy())) == k+1:
+        aucscore = roc_auc_score(batch_targets.data.numpy(), torch.softmax(batch_outputs, dim=1).data.numpy(), multi_class='ovr')
+    else:
+        aucscore = 0.0
     print("Validation loss: ", loss.data.numpy())
     print("Validation accuracy: ", acc)
+    print("Validation auc: ", aucscore)
     print()
     train_losses.append(sum(losses)/len(losses))
     validation_losses.append(loss.data.numpy())
     train_accuracies.append(sum(accuracies)/len(accuracies))
     validation_accuracies.append(acc)
+    train_aucs.append(sum(aucs)/len(aucs))
+    validation_aucs.append(aucscore)
     user_encoder.train()
 
 print("Validation accuracies: ", validation_accuracies)
+print("Validation aucs: ", validation_aucs)
 #Plot results
 iterations = [i for i in range(0, num_epochs)]
 fig = plt.figure(figsize=(12,4))
