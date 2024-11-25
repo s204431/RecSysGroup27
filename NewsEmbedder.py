@@ -13,12 +13,29 @@ import tokenizers
 import zipfile
 from huggingface_hub import hf_hub_download
 import random
+from transformers import AutoTokenizer, AutoModel
 
 class NewsEmbedder(nn.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__loadBertModel__()
 
+    def __loadBertModel__(self, model_name="Maltehb/danish-bert-botxo"):
+        """Loads a word2ved model from BERT"""
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name)
+        self.model.requires_grad_(False)  # Freeze the model, so that it cannot be trained.
+        self.embeddingDimension = self.model.config.hidden_size
+
+    def forward(self, string):
+        """Tokenizes and embeds a string"""
+        input = self.tokenizer("Virker det eller hvad?", return_tensors="pt")
+        output = self.model(**input)
+        return output.last_hidden_state
+        
+
+'''
         # Load the GloVe vectors
         self.glove_vocabulary, self.glove_vectors = self.__load_glove_vectors()
         self.glove_tokenizer = self.__create_glove_tokenizer()
@@ -64,3 +81,4 @@ class NewsEmbedder(nn.Module):
         token_ids = torch.tensor(encoding.ids)
         vectors = self.embeddings(token_ids)
         return vectors.unsqueeze(0)
+'''

@@ -109,6 +109,7 @@ for i in range(0, num_epochs):
         batch_outputs = torch.stack(batch_outputs)
         batch_targets = torch.stack(batch_targets)
         loss = criterion(batch_outputs, batch_targets)
+        print("Backtracking")
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
