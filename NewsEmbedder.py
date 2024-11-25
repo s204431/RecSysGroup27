@@ -19,7 +19,7 @@ class NewsEmbedder(nn.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nlp = spacy.load("da_core_news_lg")  # Load danish model
+        self.nlp = spacy.load("da_core_news_md")  # Load danish model
         self.embeddingDimension = 300
 
 
