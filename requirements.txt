@@ -12,3 +12,4 @@ rich
 tokenizers
 pyarrow
 fastparquet
+spacy
