@@ -34,8 +34,8 @@ class MultiHeadedAttention(nn.Module):
     """MULTI-HEADED SELF_ATTENTION"""
     def attention(self, query, key, value, mask=None, dropout=None):
         "Compute 'Scaled Dot Product Attention'"
-        d_k = query.size(-1)
-        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+        d_k = torch.tensor(query.size(-1))
+        scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(d_k)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -math.inf)
         p_attn = nn.functional.softmax(scores, dim = -1)

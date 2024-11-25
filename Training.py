@@ -42,6 +42,8 @@ def getData(user_id, inview, clicked, dataset, history_size, k=0):
             inview.remove(id)
     clicked = clicked[0]
     if k > 0:
+        if k > len(inview):
+            return None, None, None
         targets = random.sample(inview, k)
     else:
         targets = inview
@@ -74,8 +76,7 @@ history_size = 10
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
-test_dataset = ArticlesDatasetTest('ebnerd_testset')
-print(len(test_dataset))
+#test_dataset = ArticlesDatasetTest('ebnerd_testset')
 val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
 train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=h, dropout=dropout)
@@ -100,6 +101,8 @@ for i in range(0, num_epochs):
         batch_targets = []
         for user_id, inview, clicked in batch:
             history, targets, gt_position = getData(user_id, inview, clicked, dataset, history_size, k)
+            if history == None:
+                continue
             output = user_encoder(history=history, targets=targets)
             batch_outputs.append(output)
             batch_targets.append(torch.tensor(int(gt_position)))
@@ -135,6 +138,8 @@ for i in range(0, num_epochs):
     for sample in val_index_subset:
         user_id, inview, clicked = val_dataset[sample]
         history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, k)
+        if history == None:
+            continue
         output = user_encoder(history=history, targets=targets)
         batch_outputs.append(output)
         batch_targets.append(torch.tensor(int(gt_position)))
