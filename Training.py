@@ -74,8 +74,8 @@ history_size = 10
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
-test_dataset = ArticlesDatasetTest('ebnerd_testset')
-print(len(test_dataset))
+#test_dataset = ArticlesDatasetTest('ebnerd_testset')
+#print(len(test_dataset))
 val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
 train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=h, dropout=dropout)
@@ -106,6 +106,7 @@ for i in range(0, num_epochs):
         batch_outputs = torch.stack(batch_outputs)
         batch_targets = torch.stack(batch_targets)
         loss = criterion(batch_outputs, batch_targets)
+        print("Backtracking")
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
