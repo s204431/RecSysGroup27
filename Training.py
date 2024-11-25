@@ -72,7 +72,7 @@ num_epochs = 100
 validate_every = 50
 validation_size = 2000
 
-history_size = 10
+history_size = 30
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
