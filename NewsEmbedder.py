@@ -13,14 +13,26 @@ import tokenizers
 import zipfile
 from huggingface_hub import hf_hub_download
 import random
-from transformers import AutoTokenizer, AutoModel
+import spacy
 
 class NewsEmbedder(nn.Module):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__loadBertModel__()
+        self.nlp = spacy.load("da_core_news_lg")  # Load danish model
+        self.embeddingDimension = 300
 
+
+    def forward(self, string):
+        doc = self.nlp(string)
+        #token_text = [token.text for token in doc]
+        #token_ids = [token.rank for token in doc]
+        #print(token_text)
+        #print(token_ids)
+        vectors = torch.tensor([token.vector/10 for token in doc])
+        return vectors.unsqueeze(0)
+
+'''Old Bert model
     def __loadBertModel__(self, model_name="Maltehb/danish-bert-botxo"):
         """Loads a word2ved model from BERT"""
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -33,9 +45,10 @@ class NewsEmbedder(nn.Module):
         input = self.tokenizer("Virker det eller hvad?", return_tensors="pt")
         output = self.model(**input)
         return output.last_hidden_state
+'''
         
 
-'''
+''' Old GloVe model
         # Load the GloVe vectors
         self.glove_vocabulary, self.glove_vectors = self.__load_glove_vectors()
         self.glove_tokenizer = self.__create_glove_tokenizer()
