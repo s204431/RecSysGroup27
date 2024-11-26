@@ -67,12 +67,12 @@ class ArticlesDatasetTest(Dataset):
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed']]
         df_articles = df_articles[['article_id', 'title']]
-        df_behaviors = df_behaviors[['user_id', 'article_ids_inview']]
+        df_behaviors = df_behaviors[['impression_id', 'user_id', 'article_ids_inview']]
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict)
         df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(replace_ids_with_titles, article_dict=self.article_dict)
-        self.history_dict = pd.Series(df_history['article_id_fixed'].values,index=df_history['user_id']).to_dict()
+        self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
 
@@ -87,4 +87,4 @@ class ArticlesDatasetTest(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['user_id'], row['article_titles_inview']
+        return row['impression_id'], row['user_id'], row['article_titles_inview'], row['article_ids_inview']
