@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from UserEncoder import UserEncoder
 from torch import nn
 from sklearn.metrics import roc_auc_score
-from Dataloading import ArticlesDatasetTraining, ArticlesDatasetTest
+from Dataloading import ArticlesDatasetTraining, ArticlesDatasetTest, replace_ids_with_titles
 
 def getLastN(lst, N):
     if len(lst) < N:
@@ -30,13 +30,8 @@ def accuracy(outputs, targets):
             nCorrect += 1
     return nCorrect/len(targets)
 
-def replace_ids_with_titles(article_dict, article_ids):
-    return [article_dict.get(article_id) for article_id in article_ids]
-
 def getData(user_id, inview, clicked, dataset, history_size, k=0):
-    inview = inview.tolist()
-    clicked = clicked.tolist()
-    history = dataset.history_dict[user_id].tolist()
+    history = dataset.history_dict[user_id]
     for id in clicked:
         if id in inview:
             inview.remove(id)
@@ -47,8 +42,6 @@ def getData(user_id, inview, clicked, dataset, history_size, k=0):
         targets = random.sample(inview, k)
     else:
         targets = inview
-    clicked = replace_ids_with_titles(dataset.article_dict, [clicked])[0]
-    targets = replace_ids_with_titles(dataset.article_dict, targets)
     if k > 0:
         gt_position = random.randrange(0, k+1)
     else:
@@ -56,20 +49,19 @@ def getData(user_id, inview, clicked, dataset, history_size, k=0):
     targets.insert(gt_position, clicked)
     #history = getLastN(history, history_size)
     history = getRandomN(history, history_size)
-    history = replace_ids_with_titles(dataset.article_dict, history)
     return history, targets, gt_position
 
 #Parameters
 dataset_name = 'ebnerd_small'
 k = 4
-batch_size = 32
+batch_size = 64
 h = 16
 dropout = 0.2
 
 learning_rate = 1e-3
 num_epochs = 1
 
-validate_every = 2
+validate_every = 50
 validation_size = 500
 
 history_size = 10

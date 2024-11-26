@@ -20,7 +20,10 @@ def find_position(row):
         inview_list = inview_list.tolist() 
     if clicked_value in inview_list:
         return int(inview_list.index(clicked_value)) 
-    return None  
+    return None
+
+def replace_ids_with_titles(article_ids, article_dict):
+    return [article_dict.get(article_id) for article_id in article_ids]
 
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, type): #Type is "train", "validation"
@@ -35,7 +38,9 @@ class ArticlesDatasetTraining(Dataset):
         df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked']]
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
-        self.history_dict = pd.Series(df_history['article_id_fixed'].values,index=df_history['user_id']).to_dict()
+        df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict)
+        df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.article_dict)
+        self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
 
@@ -50,7 +55,7 @@ class ArticlesDatasetTraining(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['user_id'], row['article_ids_inview'], row['article_ids_clicked']
+        return row['user_id'], row['article_titles_inview'], row['article_titles_clicked']
 
 class ArticlesDatasetTest(Dataset):
     def __init__(self, DATASET):
@@ -65,6 +70,8 @@ class ArticlesDatasetTest(Dataset):
         df_behaviors = df_behaviors[['user_id', 'article_ids_inview']]
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
+        df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict)
+        df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(replace_ids_with_titles, article_dict=self.article_dict)
         self.history_dict = pd.Series(df_history['article_id_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
@@ -80,4 +87,4 @@ class ArticlesDatasetTest(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['user_id'], row['article_ids_inview']
+        return row['user_id'], row['article_titles_inview']
