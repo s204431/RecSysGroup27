@@ -62,17 +62,17 @@ def getData(user_id, inview, clicked, dataset, history_size, k=0):
 #Parameters
 dataset_name = 'ebnerd_small'
 k = 4
-batch_size = 64
+batch_size = 32
 h = 16
 dropout = 0.2
 
 learning_rate = 1e-3
-num_epochs = 100
+num_epochs = 1
 
-validate_every = 50
-validation_size = 2000
+validate_every = 2
+validation_size = 500
 
-history_size = 30
+history_size = 10
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
@@ -92,7 +92,6 @@ train_aucs = []
 validation_aucs = []
 for i in range(0, num_epochs):
     n_batches_finished = 0
-    validation_index = 0
     accuracies = []
     losses = []
     aucs = []
@@ -126,44 +125,46 @@ for i in range(0, num_epochs):
         print("Batch loss: ", float(loss.data.numpy()))
         print("Batch accuracy: ", acc)
         print("Batch auc: ", aucscore)
-        print("Average accuracy so far in epoch: ", sum(accuracies)/len(accuracies))
+        print("Average accuracy since last validation: ", sum(accuracies)/len(accuracies))
         if len(aucs) > 0:
-            print("Average auc score so far in epoch: ", sum(aucs)/len(aucs))
+            print("Average auc score since last validation: ", sum(aucs)/len(aucs))
         print()
         if n_batches_finished % validate_every == 0:
-            break
-    user_encoder.eval()
-    print("Validation in epoch", i)
-    batch_outputs = []
-    batch_targets = []
-    for sample in val_index_subset:
-        user_id, inview, clicked = val_dataset[sample]
-        history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, k)
-        if history == None:
-            continue
-        output = user_encoder(history=history, targets=targets)
-        batch_outputs.append(output)
-        batch_targets.append(torch.tensor(int(gt_position)))
-    batch_outputs = torch.stack(batch_outputs)
-    batch_targets = torch.stack(batch_targets)
-    loss = criterion(batch_outputs, batch_targets)
-    acc = accuracy(batch_outputs, batch_targets)
-    if len(np.unique(batch_targets.data.numpy())) == k+1:
-        aucscore = roc_auc_score(batch_targets.data.numpy(), torch.softmax(batch_outputs, dim=1).data.numpy(), multi_class='ovr')
-    else:
-        aucscore = 0.0
-    print("Validation loss: ", loss.data.numpy())
-    print("Validation accuracy: ", acc)
-    print("Validation auc: ", aucscore)
-    print()
-    train_losses.append(sum(losses)/len(losses))
-    validation_losses.append(loss.data.numpy())
-    train_accuracies.append(sum(accuracies)/len(accuracies))
-    validation_accuracies.append(acc)
-    if len(aucs) > 0:
-        train_aucs.append(sum(aucs)/len(aucs))
-    validation_aucs.append(aucscore)
-    user_encoder.train()
+            user_encoder.eval()
+            print("Validation number", n_batches_finished//validate_every)
+            batch_outputs = []
+            batch_targets = []
+            for sample in val_index_subset:
+                user_id, inview, clicked = val_dataset[sample]
+                history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, k)
+                if history == None:
+                    continue
+                output = user_encoder(history=history, targets=targets)
+                batch_outputs.append(output)
+                batch_targets.append(torch.tensor(int(gt_position)))
+            batch_outputs = torch.stack(batch_outputs)
+            batch_targets = torch.stack(batch_targets)
+            loss = criterion(batch_outputs, batch_targets)
+            acc = accuracy(batch_outputs, batch_targets)
+            if len(np.unique(batch_targets.data.numpy())) == k+1:
+                aucscore = roc_auc_score(batch_targets.data.numpy(), torch.softmax(batch_outputs, dim=1).data.numpy(), multi_class='ovr')
+            else:
+                aucscore = 0.0
+            print("Validation loss: ", loss.data.numpy())
+            print("Validation accuracy: ", acc)
+            print("Validation auc: ", aucscore)
+            print()
+            train_losses.append(sum(losses)/len(losses))
+            validation_losses.append(loss.data.numpy())
+            train_accuracies.append(sum(accuracies)/len(accuracies))
+            validation_accuracies.append(acc)
+            if len(aucs) > 0:
+                train_aucs.append(sum(aucs)/len(aucs))
+            validation_aucs.append(aucscore)
+            accuracies = []
+            losses = []
+            aucs = []
+            user_encoder.train()
 
 print("Validation accuracies: ", validation_accuracies)
 print("Validation aucs: ", validation_aucs)
