@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, help='Se seed to get same results')
     parser.add_argument('--h', type=int, default=16, help='Number of header')
     parser.add_argument('--dropout', type=float, default=0.2, help='Dropout value')
-    parser.add_argument('--dataset', type=str, default='ebnerd_small', help='Dropout value')
+    parser.add_argument('--datasegitt', type=str, default='ebnerd_small', help='Dropout value')
     parser.add_argument('--batch_size', type=int, default=64, help='Size of the batch')
     parser.add_argument('--history_size', type=int, default=30, help='Number of articles used in userencoder from history')
 
