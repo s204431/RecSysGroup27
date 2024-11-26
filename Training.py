@@ -1,14 +1,12 @@
 import torch
 import random
 import numpy as np
-import matplotlib.pyplot as plt
-
-
 from torch.utils.data import DataLoader
 from UserEncoder import UserEncoder
 from torch import nn
 from sklearn.metrics import roc_auc_score
-from Dataloading import ArticlesDatasetTraining, ArticlesDatasetTest, replace_ids_with_titles
+from Dataloading import ArticlesDatasetTraining
+from Testing import runOnTestSet
 
 def getLastN(lst, N):
     if len(lst) < N:
@@ -63,12 +61,12 @@ num_epochs = 1
 
 validate_every = 50
 validation_size = 500
+max_batches = 100000000 #Use this if you want to end the training early
 
 history_size = 10
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
-#test_dataset = ArticlesDatasetTest('ebnerd_testset')
 val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
 train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=h, dropout=dropout)
@@ -82,8 +80,8 @@ train_accuracies = []
 validation_accuracies = []
 train_aucs = []
 validation_aucs = []
+n_batches_finished = 0
 for i in range(0, num_epochs):
-    n_batches_finished = 0
     accuracies = []
     losses = []
     aucs = []
@@ -157,20 +155,19 @@ for i in range(0, num_epochs):
             losses = []
             aucs = []
             user_encoder.train()
+        if n_batches_finished >= max_batches:
+            break
+    if n_batches_finished >= max_batches:
+        break
 
 print("Validation accuracies: ", validation_accuracies)
 print("Validation aucs: ", validation_aucs)
-#Plot results
-iterations = [i for i in range(0, num_epochs)]
-fig = plt.figure(figsize=(12,4))
-plt.subplot(1, 2, 1)
-plt.plot(iterations, train_losses, label='train_loss')
-plt.plot(iterations, validation_losses, label='valid_loss')
-plt.legend()
 
-plt.subplot(1, 2, 2)
-plt.plot(iterations, train_accuracies, label='train_accs')
-plt.plot(iterations, validation_accuracies, label='valid_accs')
-plt.legend()
-plt.show()
+#Release train and validation datasets from memory before testing
+dataset = None
+val_dataset = None
+train_loader = None
 
+#Testing
+with torch.no_grad():
+    runOnTestSet(user_encoder, history_size)
