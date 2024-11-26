@@ -12,8 +12,8 @@ class NewsEncoder(nn.Module):
         super(NewsEncoder, self).__init__()
         self.h = h
         self.dropout = dropout
-        self.newsEmbedder = NewsEmbedder()
-        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.newsEmbedder.embeddingDimension, d_model_out=d_model_out, dropout=self.dropout)
+        self.newsEmbedder = NewsEmbedder().to(DEVICE)
+        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.newsEmbedder.embeddingDimension, d_model_out=d_model_out, dropout=self.dropout).to(DEVICE)
     
     def forward(self, string):
         vectors = self.newsEmbedder(string)

@@ -15,6 +15,8 @@ from huggingface_hub import hf_hub_download
 import random
 import spacy
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 class NewsEmbedder(nn.Module):
 
     def __init__(self, *args, **kwargs):
@@ -29,7 +31,7 @@ class NewsEmbedder(nn.Module):
         #token_ids = [token.rank for token in doc]
         #print(token_text)
         #print(token_ids)
-        vectors = torch.tensor([token.vector/10 for token in doc])
+        vectors = torch.tensor([token.vector/10 for token in doc]).to(DEVICE)
         return vectors.unsqueeze(0)
 
 '''Old Bert model

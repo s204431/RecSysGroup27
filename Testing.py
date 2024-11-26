@@ -1,4 +1,4 @@
-from Dataloading import ArticlesDatasetTest
+from Dataloading import ArticlesDatasetValTest
 import random
 
 def getRandomN(lst, N):
@@ -25,7 +25,7 @@ def runOnTestSet(user_encoder, history_size):
     log_every = 100000
 
     user_encoder.eval()
-    test_dataset = ArticlesDatasetTest('ebnerd_testset')
+    test_dataset = ArticlesDatasetValTest('ebnerd_testset', 'test')
     outputs = []
     iteration = 0
     for impression_id, user_id, inview_titles, inview_ids in test_dataset:
