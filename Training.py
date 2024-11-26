@@ -60,15 +60,17 @@ dropout = 0.2
 learning_rate = 1e-3
 num_epochs = 1
 
-validate_every = 50
-validation_size = 500
+validate_every = 10000000
+validation_size = 10
+validation_number = 1
 max_batches = 100000000 #Use this if you want to end the training early
 
 history_size = 10
 
+
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-def training(user_encoder, train_dataset, train_loader, val_dataset, optimizer, criterion, history_size, experiment_name):
+def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader, optimizer, criterion, history_size, experiment_name):
 
     wandb.init(
         project = 'News prediction',
@@ -78,8 +80,6 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, optimizer, 
             "learning_rate": optimizer.param_groups[0]['lr']
         }
     )
-
-    user_encoder.train()
 
     train_loss = 0.0
     train_accuracies = 0.0
@@ -91,15 +91,15 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, optimizer, 
         accuracies = []
         losses = []
         aucs = []
+        user_encoder.train()
 
         for batch in train_loader:
+            #print('training')
 
             batch_outputs = []
             batch_targets = []
-            ja = 0
+
             for user_id, inview, clicked in batch:
-                ja += 1
-                print(ja)
                 history, targets, gt_position = getData(user_id, inview, clicked, train_dataset, history_size, k)
                 if history == None:
                     continue
@@ -132,44 +132,62 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, optimizer, 
                 'Average train loss': train_loss/n_batches_finished,
                 'Average train auc': train_aucs/n_batches_finished,
                 'Average train accuracy': train_accuracies/n_batches_finished,
-                'Number of epochs': i+1
             })
             
-            continue
-            #if n_batches_finished % validate_every == 0:
-            #    user_encoder.eval()
-            #    print("Validation number", n_batches_finished//validate_every)
-            #    batch_outputs = []
-            #    batch_targets = []
-            #    for sample in val_index_subset:
-            #        user_id, inview, clicked = val_dataset[sample]
-            #        history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, k)
-            #        if history == None:
-            #            continue
-            #        output = user_encoder(history=history, targets=targets)
-            #        batch_outputs.append(output)
-            #        batch_targets.append(torch.tensor(int(gt_position)))
-            #    batch_outputs = torch.stack(batch_outputs)
-            #    batch_targets = torch.stack(batch_targets)
-            #    loss = criterion(batch_outputs, batch_targets)
-            #    acc = accuracy(batch_outputs, batch_targets)
-            #    if len(np.unique(batch_targets.data.numpy())) == k+1:
-            #        aucscore = roc_auc_score(batch_targets.data.numpy(), torch.softmax(batch_outputs, dim=1).data.numpy(), multi_class='ovr')
-            #    else:
-            #        aucscore = 0.0
-            #    train_losses += loss
-            #    validation_losses.append(loss.data.numpy())
-            #    train_accuracies.append(sum(accuracies)/len(accuracies))
-            #    validation_accuracies.append(acc)
-            #    if len(aucs) > 0:
-            #        train_aucs.append(sum(aucs)/len(aucs))
-            #    validation_aucs.append(aucscore)
-            #    accuracies = []
-            #    losses = []
-            #    aucs = []
-            #    user_encoder.train()
-            #if n_batches_finished >= max_batches:
-            #    break
+      
+            if n_batches_finished % validate_every == 0:
+                val_count = 1
+                print('validation')
+                val_loss = 0
+                val_accuracies = 0
+                val_aucs = 0
+                user_encoder.eval()
+
+                with torch.no_grad():
+                    
+                    for user_ids, inview, clicked in val_loader:
+
+                        batch_outputs = []
+                        batch_targets = []
+          
+                        for user_id, inview, clicked in zip(user_ids, inview, clicked):
+                            history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, 0)
+                            if history == None:
+                                continue
+                            output = user_encoder(history=history, targets=targets)
+                            batch_outputs.append(output)
+                            batch_targets.append(torch.tensor(int(gt_position)))
+
+                        batch_outputs = torch.stack(batch_outputs).to(DEVICE)
+                        batch_targets = torch.stack(batch_targets).to(DEVICE)
+                        loss = criterion(batch_outputs, batch_targets)
+
+                        val_loss += loss
+                        val_accuracies += accuracy(batch_outputs, batch_targets)
+
+                        if len(torch.unique(batch_targets)) == k + 1 == k+1:
+                            batch_targets_cpu = batch_targets.cpu().detach().numpy()
+                            batch_outputs_softmax = torch.softmax(batch_outputs, dim=1).cpu().detach().numpy()
+
+                            # Calculate AUC score and accumulate it
+                            val_aucs += roc_auc_score(batch_targets_cpu, batch_outputs_softmax, multi_class='ovr')
+
+                        if val_count > validation_size:
+                            break
+                        print(val_count)
+                        val_count += 1
+
+
+                    wandb.log({
+                        'Validation number': validation_number,
+                        'Average val loss': val_loss/val_count,
+                        'Average val auc': val_aucs/val_count,
+                        'Average val accuracy': val_accuracies/val_count,
+                    })
+
+
+            if n_batches_finished >= max_batches:
+                break
         if n_batches_finished >= max_batches:
             break
 

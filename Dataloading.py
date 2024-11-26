@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import numpy as np
 import time
 import pandas as pd
+from torch.utils.data import DataLoader
 
 def flatten(lst):
     flattened_list = []
@@ -26,12 +27,12 @@ def replace_ids_with_titles(article_ids, article_dict):
     return [article_dict.get(article_id) for article_id in article_ids]
 
 class ArticlesDatasetTraining(Dataset):
-    def __init__(self, DATASET): #Type is "train", "validation"
+    def __init__(self, DATASET, type_): #Type is "train", "validation"
         start = time.time()
         PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
-        df_history   = pd.read_parquet(PATH.joinpath(DATASET, 'train', "history.parquet"))
-        df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, 'train', "behaviors.parquet"))
+        df_history   = pd.read_parquet(PATH.joinpath(DATASET, type_, "history.parquet"))
+        df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type_, "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed']]
         df_articles = df_articles[['article_id', 'title']]
@@ -57,13 +58,15 @@ class ArticlesDatasetTraining(Dataset):
         row = self.df_data.iloc[idx]
         return row['user_id'], row['article_titles_inview'], row['article_titles_clicked']
 
-class ArticlesDatasetValTest(Dataset):
-    def __init__(self, DATASET, type_):
+
+
+class ArticlesDatasetTest(Dataset):
+    def __init__(self, DATASET):
         start = time.time()
         PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
-        df_history   = pd.read_parquet(PATH.joinpath(DATASET, type_, "history.parquet"))
-        df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type_, "behaviors.parquet"))
+        df_history   = pd.read_parquet(PATH.joinpath(DATASET, 'test', "history.parquet"))
+        df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, 'test', "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed']]
         df_articles = df_articles[['article_id', 'title']]
