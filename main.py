@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import argparse
 import random
+import cProfile  
 
 from UserEncoder import UserEncoder
 from Dataloading import ArticlesDatasetTraining, ArticlesDatasetTest
@@ -53,7 +54,8 @@ def main(args):
 
     training(user_encoder, train_dataset, train_loader, val_dataset, val_loader, optimizer, criterion, args.history_size, args.experiment_name)
 
-    #runOnTestSet(user_encoder, args.history_size)
+
+
 
 
 if __name__ == '__main__':

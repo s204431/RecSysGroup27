@@ -5,7 +5,7 @@
 #BSUB -J train_15min
 #BSUB -R "span[hosts=1]"
 #BSUB -R "rusage[mem=10GB]"
-#BSUB -W 12:00
+#BSUB -W 00:03
 #BSUB -o job_outputs/train_15min%J.out
 #BSUB -e job_outputs/train_15min%J.err
 

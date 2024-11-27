@@ -63,7 +63,7 @@ num_epochs = 1
 validate_every = 10000000
 validation_size = 10
 validation_number = 1
-max_batches = 100000000 #Use this if you want to end the training early
+max_batches = 2000000 #100000000 #Use this if you want to end the training early
 
 history_size = 10
 
@@ -136,6 +136,7 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
             
       
             if n_batches_finished % validate_every == 0:
+                
                 val_count = 1
                 print('validation')
                 val_loss = 0
@@ -191,14 +192,11 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
         if n_batches_finished >= max_batches:
             break
 
-    print("Validation accuracies: ", validation_accuracies)
-    print("Validation aucs: ", validation_aucs)
-
-    #Release train and validation datasets from memory before testing
-    dataset = None
-    val_dataset = None
-    train_loader = None
-
-    #Testing
-    with torch.no_grad():
-        runOnTestSet(user_encoder, history_size)
+    ##Release train and validation datasets from memory before testing
+    #dataset = None
+    #val_dataset = None
+    #train_loader = None
+#
+    ##Testing
+    #with torch.no_grad():
+    #    runOnTestSet(user_encoder, history_size)
