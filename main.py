@@ -9,6 +9,7 @@ from Dataloading import ArticlesDatasetTraining, ArticlesDatasetTest
 from torch.utils.data import DataLoader
 from Training import training
 from Testing import runOnTestSet
+from transformers import AutoTokenizer, AutoModel
 
 def collate_fn_variable_length(batch):
     user_ids = []
@@ -28,10 +29,12 @@ def main(args):
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
+    tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
+    model_token = AutoModel.from_pretrained('xlm-roberta-large').to(DEVICE)
     user_encoder = UserEncoder(args.h, args.dropout).to(DEVICE)
 
-    train_dataset = ArticlesDatasetTraining(args.dataset, 'train')
-    val_dataset = ArticlesDatasetTraining(args.dataset, 'validation')
+    train_dataset = ArticlesDatasetTraining(args.dataset, 'train', model_token, tokenizer)
+    #val_dataset = ArticlesDatasetTraining(args.dataset, 'validation', model_token)
 
     train_loader = DataLoader(
         train_dataset,
@@ -41,18 +44,22 @@ def main(args):
         collate_fn = list
     )
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size = 32,
-        shuffle = True,
-        num_workers = 1,
-        collate_fn = collate_fn_variable_length
-    )
+    for batch in train_loader:
+        print(batch)
+        break
+
+    #val_loader = DataLoader(
+    #    val_dataset,
+    #    batch_size = 32,
+    #    shuffle = True,
+    #    num_workers = 1,
+    #    collate_fn = collate_fn_variable_length
+    #)
 
     optimizer = torch.optim.Adam(user_encoder.parameters(), lr=args.learning_rate)
     criterion = nn.NLLLoss()
 
-    training(user_encoder, train_dataset, train_loader, val_dataset, val_loader, optimizer, criterion, args.history_size, args.experiment_name)
+    #training(user_encoder, train_dataset, train_loader, val_dataset, val_loader, optimizer, criterion, args.history_size, args.experiment_name)
 
 
 

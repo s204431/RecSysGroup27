@@ -3,6 +3,7 @@ import random
 import numpy as np
 import sys
 import wandb
+import time
 
 from torch.utils.data import DataLoader
 from UserEncoder import UserEncoder
@@ -86,6 +87,8 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
     train_aucs = 0.0
     n_batches_finished = 0
 
+    batch_time = 0.0
+
     for i in range(0, num_epochs):
 
         accuracies = []
@@ -95,6 +98,7 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
 
         for batch in train_loader:
             #print('training')
+            start_batch = time.time()
 
             batch_outputs = []
             batch_targets = []
@@ -124,8 +128,11 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
                 # Calculate AUC score and accumulate it
                 train_aucs += roc_auc_score(batch_targets_cpu, batch_outputs_softmax, multi_class='ovr')
             
-
+            batch_time +=  time.time() - start_batch
+            print('Time for batch', time.time() - start_batch)
             n_batches_finished += 1
+            print('average batch time', batch_time/n_batches_finished)
+
 
             wandb.log({
                 'Finished batches': n_batches_finished,
