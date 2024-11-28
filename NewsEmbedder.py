@@ -16,11 +16,32 @@ import random
 import spacy
 
 class NewsEmbedder(nn.Module):
+    def init(self, args, **kwargs):
+        super().init(args, **kwargs)
+        self.nlp = spacy.load("da_core_news_md")  # Load danish model
+        self.embeddingDimension = 300
+        data = (self.nlp.vocab.vectors.data/10).tolist()
+        data.append([0.0 for _ in range(0, self.embeddingDimension)])
+        vectors = torch.tensor(data)
+        self.embeddings = torch.nn.Embedding(vectors.shape[0], vectors.shape[1], padding_idx=vectors.shape[0]-1)
+        print(vectors[-1])
+        self.embeddings.weight.data = vectors
 
+    def forward(self, token_ids):
+        vectors = self.embeddings(token_ids)
+        return vectors.unsqueeze(0)
+
+'''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.nlp = spacy.load("da_core_news_md")  # Load danish model
         self.embeddingDimension = 300
+        
+        # Instantiate enbeddings layer using vectors
+        self.vectors = torch.tensor(self.nlp.vocab.vectors.data)
+        self.embeddings = nn.Embedding(*self.vectors.shape)
+        self.embeddings.weight.data = self.vectors
+        self.embeddings.weight.requires_grad = False    # Freeze embedding layer to disable backtracking (training)
 
 
     def forward(self, string):
@@ -31,6 +52,7 @@ class NewsEmbedder(nn.Module):
         #print(token_ids)
         vectors = torch.tensor([token.vector/10 for token in doc])
         return vectors.unsqueeze(0)
+'''
 
 '''Old Bert model
     def __loadBertModel__(self, model_name="Maltehb/danish-bert-botxo"):

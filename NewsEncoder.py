@@ -13,8 +13,8 @@ class NewsEncoder(nn.Module):
         self.h = h
         self.dropout = dropout
         self.newsEmbedder = NewsEmbedder()
-        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.newsEmbedder.embeddingDimension, d_model_out=d_model_out, dropout=self.dropout)
+        self.MHSA = MultiHeadedAttention(h=self.h, d_model=300, d_model_out=d_model_out, dropout=self.dropout)
     
-    def forward(self, string):
-        vectors = self.newsEmbedder(string)
+    def forward(self, token_ids):
+        vectors = self.newsEmbedder(token_ids)
         return self.MHSA(vectors, vectors, vectors)
