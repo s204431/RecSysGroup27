@@ -7,6 +7,10 @@ from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
 from Testing import runOnTestSet
+import spacy
+from torch.nn.utils.rnn import pad_sequence
+
+nlp = spacy.load("da_core_news_md")  # Load danish model
 
 def getLastN(lst, N):
     if len(lst) < N:
@@ -49,6 +53,61 @@ def getData(user_id, inview, clicked, dataset, history_size, k=0):
     history = getRandomN(history, history_size)
     return history, targets, gt_position
 
+def replace_titles_with_tokens(article_titles, nlp, max_vocab_size, batch_size=1000):
+    with nlp.select_pipes(enable="tokenizer"):
+        return [[min(max_vocab_size, token.rank) for token in doc] for doc in nlp.pipe(article_titles, batch_size=batch_size)]
+    
+def pad_tokens(tokens, token_length, padding_value):
+    if len(tokens) > token_length:
+        return tokens[:token_length]
+    padding = [padding_value] * (token_length - len(tokens))
+    return tokens + padding
+
+def pad_token_list(token_list, token_length, padding_value, list_length):
+    new_token_list = [pad_tokens(tokens=tokens, token_length=token_length, padding_value=padding_value) for tokens in token_list]
+    if len(new_token_list) > list_length:
+        return new_token_list[:list_length]
+    title_padding = [padding_value] * (list_length - len(new_token_list))
+    return new_token_list + title_padding
+
+def pad_token_list_only_tokens(token_list, token_length, padding_value):
+    return [pad_tokens(tokens=tokens, token_length=token_length, padding_value=padding_value) for tokens in token_list]
+
+def make_batch(batch):
+    max_title_size = 20
+    vocab_size = nlp.vocab.vectors.shape[0]
+    unknown_token_vector = [vocab_size for _ in range(max_title_size)]
+    batch_history = []
+    batch_targets = []
+    batch_gtpositions = []
+    for user_id, inview, clicked in batch:
+        history, targets, gt_position = getData(user_id, inview, clicked, dataset, history_size, k)
+        if history == None:
+            continue
+        #output = user_encoder(history=history, targets=targets)
+        #batch_outputs.append(output)
+        history_tokens_ids = []
+        for title in history:
+            doc = nlp(title)
+            #history_tokens_ids.append(([(token.rank if token.rank < vocab_size else vocab_size) for token in doc] + unknown_token_vector)[:max_title_size])
+            history_tokens_ids.append(torch.tensor([(token.rank if token.rank < vocab_size else vocab_size) for token in doc]))
+
+        target_tokens_ids = []
+        for title in targets:
+            doc = nlp(title)
+            #target_tokens_ids.append(([(token.rank if token.rank < vocab_size else vocab_size) for token in doc] + unknown_token_vector)[:max_title_size])
+            target_tokens_ids.append(torch.tensor([(token.rank if token.rank < vocab_size else vocab_size) for token in doc]))
+
+        #print(pad_sequence(history_tokens_ids, batch_first=True, padding_value=vocab_size).shape)
+        batch_history.append(pad_sequence(history_tokens_ids, batch_first=True, padding_value=vocab_size))
+        batch_targets.append(pad_sequence(target_tokens_ids, batch_first=True, padding_value=vocab_size))
+        batch_gtpositions.append(torch.tensor(int(gt_position)))
+    batch_history = torch.stack(batch_history)
+    batch_targets = torch.stack(batch_targets)
+    batch_gtpositions = torch.stack(batch_gtpositions)
+    return batch_history, batch_targets, batch_gtpositions
+
+
 #Parameters
 dataset_name = 'ebnerd_small'
 k = 4
@@ -86,6 +145,8 @@ for i in range(0, num_epochs):
     losses = []
     aucs = []
     for batch in train_loader:
+
+        '''
         batch_outputs = []
         batch_targets = []
         for user_id, inview, clicked in batch:
@@ -97,6 +158,16 @@ for i in range(0, num_epochs):
             batch_targets.append(torch.tensor(int(gt_position)))
         batch_outputs = torch.stack(batch_outputs)
         batch_targets = torch.stack(batch_targets)
+        '''
+        batch_history, batch_targets, batch_gtpositions = make_batch(batch)
+
+        batch_outputs = []
+        for history, targets in zip(batch_history, batch_targets):
+            output = user_encoder(history=history, targets=targets)
+            batch_outputs.append(output)
+        batch_outputs = torch.stack(batch_outputs)
+        batch_targets = batch_gtpositions
+
         loss = criterion(batch_outputs, batch_targets)
         print("Backtracking")
         optimizer.zero_grad()
