@@ -23,7 +23,7 @@ class MultiHeadedAttention(nn.Module):
         super(MultiHeadedAttention, self).__init__()
         assert d_model_out % h == 0
         # We assume d_v always equals d_k
-        self.d_k = d_model_out // h
+        self.d_k = torch.tensor(d_model_out // h)
         self.h = h
         self.linears = nn.ModuleList([nn.Linear(d_model, d_model_out) for _ in range(3)])
         self.linears.append(nn.Linear(d_model_out, d_model_out))

@@ -24,16 +24,18 @@ class UserEncoder(nn.Module):
         self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0)
 
     def forward(self, history, targets):
-        encoded_history = torch.stack([self.news_encoder(title).squeeze() for title in history], 0).unsqueeze(0)
+        batch_size = history.shape[0]
+        history_size = history.shape[1]
+        targets_size = targets.shape[1]
 
-        #print("Encoded history shape", encoded_history.shape)
+        encoded_history = self.news_encoder(history.contiguous().view(-1, *history.shape[2:]))
+        encoded_history = encoded_history.contiguous().view(batch_size, history_size, *encoded_history.shape[1:])
         u = self.MHSA(encoded_history, encoded_history, encoded_history)
 
-        predictions = []
-        for i in range(len(targets)):
-            r = self.news_encoder(targets[i])
-            predictions.append(torch.dot(u.squeeze(), r.squeeze()))
-        return nn.LogSoftmax(dim=0)(torch.stack(predictions))
+        r = self.news_encoder(targets.contiguous().view(-1, *targets.shape[2:]))
+        r = r.contiguous().view(batch_size, targets_size, *r.shape[1:])
+        dot_product = torch.bmm(r, u.unsqueeze(2)).squeeze(2)
+        return nn.LogSoftmax(dim=1)(dot_product)
 
 
 #history = ["This a test", "This is the click history"]
@@ -43,3 +45,18 @@ class UserEncoder(nn.Module):
 
 #rich.print(output.shape)
 #rich.print(output)
+
+#torch.manual_seed(42)
+#history_input = torch.tensor([[[0, 1, 2], [3, 4, 5]], [[6, 7, 8], [9, 10, 11]]])
+#targets_input = torch.tensor([[[0, 1, 2], [3, 4, 5], [20000, 20000, 20000]], [[6, 7, 8], [9, 10, 11], [20000, 20000, 20000]]])
+#user_encoder = UserEncoder(16, 0.2)
+#output = user_encoder(history_input, targets_input)
+#print(output)
+#u = torch.tensor([[0, 1, 2], [3, 4, 5]])
+#r = torch.tensor([[6, 7, 8], [9, 10, 11]])
+#print(torch.sum(u * r, dim=1))
+
+
+#news_encoder = NewsEncoder(d_model_out=16, h=16, dropout=0.2)
+#input = torch.tensor([[0, 1, 2, 20000], [3, 4, 5, 20000]])
+#print(news_encoder(input))

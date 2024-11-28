@@ -16,20 +16,19 @@ import random
 import spacy
 
 class NewsEmbedder(nn.Module):
-    def init(self, args, **kwargs):
-        super().init(args, **kwargs)
+    def __init__(self):
+        super(NewsEmbedder, self).__init__()
         self.nlp = spacy.load("da_core_news_md")  # Load danish model
         self.embeddingDimension = 300
         data = (self.nlp.vocab.vectors.data/10).tolist()
         data.append([0.0 for _ in range(0, self.embeddingDimension)])
         vectors = torch.tensor(data)
         self.embeddings = torch.nn.Embedding(vectors.shape[0], vectors.shape[1], padding_idx=vectors.shape[0]-1)
-        print(vectors[-1])
         self.embeddings.weight.data = vectors
 
     def forward(self, token_ids):
         vectors = self.embeddings(token_ids)
-        return vectors.unsqueeze(0)
+        return vectors
 
 '''
     def __init__(self, *args, **kwargs):
