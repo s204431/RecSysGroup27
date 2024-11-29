@@ -54,7 +54,13 @@ def make_batch(batch, dataset, nlp, k, history_size):
     return batch_history, batch_targets
 
 def runOnTestSet(user_encoder, history_size, nlp):
-    log_every = 50
+
+    wandb.init(
+        project="News_prediction",  # Set your W&B project name
+        name='runOnTestSet',        # Name of the experiment
+    )    
+
+    log_every = 10000
     batch_size = 200
 
     user_encoder.eval()
@@ -83,6 +89,9 @@ def runOnTestSet(user_encoder, history_size, nlp):
         iteration += 1
         #print("Time to convert output: ", time.time() - start)
         if iteration % log_every == 0:
+                wandb.log({
+                    "Finished": len(outputs)
+                })
                 print("Finished: ", len(outputs))
                 #print("Test iteration", iteration)
                 #break
