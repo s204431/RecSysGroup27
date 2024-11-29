@@ -3,6 +3,7 @@ import random
 import numpy as np
 import sys
 import wandb
+import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
 from UserEncoder import UserEncoder
@@ -60,7 +61,7 @@ dropout = 0.2
 learning_rate = 1e-3
 num_epochs = 1
 
-validate_every = 10000000
+validate_every = 100000000
 validation_size = 10
 validation_number = 1
 max_batches = 100000000 #Use this if you want to end the training early
@@ -96,36 +97,44 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
         for batch in train_loader:
             #print('training')
 
-            batch_outputs = []
+            batch_logSoftmax = []
             batch_targets = []
+            batch_Softmax = []
 
             for user_id, inview, clicked in batch:
                 history, targets, gt_position = getData(user_id, inview, clicked, train_dataset, history_size, k)
                 if history == None:
                     continue
                 output = user_encoder(history=history, targets=targets)
-                batch_outputs.append(output)
+
+                batch_logSoftmax.append(nn.LogSoftmax(dim=0)(output))
+                batch_Softmax.append(nn.Softmax(dim=0)(output))
                 batch_targets.append(torch.tensor(int(gt_position)))
 
-            batch_outputs = torch.stack(batch_outputs).to(DEVICE)
+            batch_logSoftmaxs = torch.stack(batch_logSoftmax).to(DEVICE)
             batch_targets = torch.stack(batch_targets).to(DEVICE)
-            loss = criterion(batch_outputs, batch_targets)
+            batch_Softmaxs = torch.stack(batch_Softmax).to(DEVICE)
+
+
+            loss = criterion(batch_logSoftmaxs, batch_targets)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             train_loss += loss
-            train_accuracies += accuracy(batch_outputs, batch_targets)
+          
+            train_accuracies += accuracy(batch_Softmaxs, batch_targets)
    
-            if len(torch.unique(batch_targets)) == k + 1 == k+1:
+            if len(torch.unique(batch_targets)) == k + 1:
+                batch_Softmaxs_cpu = batch_Softmaxs.cpu().detach().numpy()
                 batch_targets_cpu = batch_targets.cpu().detach().numpy()
-                batch_outputs_softmax = torch.softmax(batch_outputs, dim=1).cpu().detach().numpy()
 
-                # Calculate AUC score and accumulate it
-                train_aucs += roc_auc_score(batch_targets_cpu, batch_outputs_softmax, multi_class='ovr')
+                train_aucs += roc_auc_score(batch_targets_cpu, batch_Softmaxs_cpu, multi_class='ovr')
             
 
             n_batches_finished += 1
+            print(n_batches_finished)
 
             wandb.log({
                 'Finished batches': n_batches_finished,
@@ -134,7 +143,7 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
                 'Average train accuracy': train_accuracies/n_batches_finished,
             })
             
-      
+            
             if n_batches_finished % validate_every == 0:
                 val_count = 1
                 print('validation')
@@ -151,31 +160,58 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
                         batch_targets = []
           
                         for user_id, inview, clicked in zip(user_ids, inview, clicked):
+                            
                             history, targets, gt_position = getData(user_id, inview, clicked, val_dataset, history_size, 0)
                             if history == None:
                                 continue
                             output = user_encoder(history=history, targets=targets)
-                            batch_outputs.append(output)
-                            batch_targets.append(torch.tensor(int(gt_position)))
+                      
+                            output_softmax = nn.Softmax(dim=0)(output).unsqueeze(0)
+                            gt_position = torch.tensor(int(gt_position)).unsqueeze(0).to(DEVICE)
+                            loss = criterion(nn.LogSoftmax(dim=0)(output), gt_position.squeeze(0))
+                            val_loss += loss.item()
 
-                        batch_outputs = torch.stack(batch_outputs).to(DEVICE)
-                        batch_targets = torch.stack(batch_targets).to(DEVICE)
-                        loss = criterion(batch_outputs, batch_targets)
+                            acc = accuracy(output_softmax, gt_position)
+                            val_accuracies += acc
+                            
+                            softmax_numpy = output_softmax.cpu().detach().numpy()
+                            targets_numpy = gt_position.cpu().detach().numpy()
+                            num_classes = softmax_numpy.shape[1]
+                            targets_one_hot = F.one_hot(gt_position.squeeze(0), num_classes=num_classes).unsqueeze(0).cpu().numpy()
+                            print(targets_one_hot)
 
-                        val_loss += loss
-                        val_accuracies += accuracy(batch_outputs, batch_targets)
+                            print(f"softmax_numpy.shape: {softmax_numpy.shape}")  # (batch_size, num_classes)
+                            print(f"targets_numpy.shape: {targets_numpy.shape}")  # (batch_size,)
+                            print(f"targets_one_hot.shape: {targets_one_hot.shape}")  # (batch_size, num_classes)
 
-                        if len(torch.unique(batch_targets)) == k + 1 == k+1:
-                            batch_targets_cpu = batch_targets.cpu().detach().numpy()
-                            batch_outputs_softmax = torch.softmax(batch_outputs, dim=1).cpu().detach().numpy()
 
-                            # Calculate AUC score and accumulate it
-                            val_aucs += roc_auc_score(batch_targets_cpu, batch_outputs_softmax, multi_class='ovr')
+                            # Beregn AUC
+                            auc_score = roc_auc_score(targets_one_hot, softmax_numpy, multi_class='ovr')
+                            val_aucs += auc
 
+                            print(val_count)
+                            val_count += 1
+                            
+
+
+                        #batch_outputs = torch.stack(batch_outputs).to(DEVICE)
+                        #batch_targets = torch.stack(batch_targets).to(DEVICE)
+                        #loss = criterion(batch_outputs, batch_targets)
+#
+                        #val_loss += loss
+                        #val_accuracies += accuracy(batch_outputs, batch_targets)
+#
+                        #if len(torch.unique(batch_targets)) == k + 1 == k+1:
+                        #    batch_targets_cpu = batch_targets.cpu().detach().numpy()
+                        #    batch_outputs_softmax = torch.softmax(batch_outputs, dim=1).cpu().detach().numpy()
+#
+                        #    # Calculate AUC score and accumulate it
+                        #    val_aucs += roc_auc_score(batch_targets_cpu, batch_outputs_softmax, multi_class='ovr')
+#
                         if val_count > validation_size:
                             break
-                        print(val_count)
-                        val_count += 1
+                        
+                        
 
 
                     wandb.log({
@@ -184,6 +220,8 @@ def training(user_encoder, train_dataset, train_loader, val_dataset, val_loader,
                         'Average val auc': val_aucs/val_count,
                         'Average val accuracy': val_accuracies/val_count,
                     })
+
+                    validation_number += 1
 
 
             if n_batches_finished >= max_batches:

@@ -24,6 +24,8 @@ def collate_fn_variable_length(batch):
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 def main(args):
+    print(DEVICE)
+    print(torch.version.cuda)
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
@@ -53,7 +55,7 @@ def main(args):
 
     training(user_encoder, train_dataset, train_loader, val_dataset, val_loader, optimizer, criterion, args.history_size, args.experiment_name)
 
-    #runOnTestSet(user_encoder, args.history_size)
+    runOnTestSet(user_encoder, args.history_size)
 
 
 if __name__ == '__main__':
