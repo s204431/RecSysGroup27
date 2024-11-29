@@ -1,3 +1,6 @@
 ebnerd_data/
 __pycache__/
 predictions.txt
+job_outputs/
+wandb/
+git
