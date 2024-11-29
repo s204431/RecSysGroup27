@@ -41,7 +41,8 @@ class ArticlesDatasetTraining(Dataset):
         self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
         #df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         #df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
-        mapping = lambda article_ids: [f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in article_ids]
+        self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
+        mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
         df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(mapping)
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
@@ -77,10 +78,11 @@ class ArticlesDatasetTest(Dataset):
         self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
         #df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         #df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
-        #mapping = lambda article_ids: [f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in article_ids]
-        mapping = lambda article_ids: [f"{self.article_dict.get(article_id, '')}" for article_id in article_ids]
+        self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
+        mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
         df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(mapping)
+        
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
@@ -97,3 +99,9 @@ class ArticlesDatasetTest(Dataset):
         """
         row = self.df_data.iloc[idx]
         return row['impression_id'], row['user_id'], row['article_titles_inview'], row['article_ids_inview']
+
+#dataset = ArticlesDatasetTraining('ebnerd_small', 'train')
+#print(dataset[0])
+
+#test_dataset = ArticlesDatasetTest('ebnerd_testset')
+#print(test_dataset[0])
