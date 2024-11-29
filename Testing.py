@@ -7,6 +7,7 @@ import time
 import numpy as np
 from UserEncoder import UserEncoder
 import spacy
+import wandb
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -60,15 +61,17 @@ def runOnTestSet(user_encoder, history_size, nlp):
         name='runOnTestSet',        # Name of the experiment
     )    
 
-    log_every = 10000
+    log_every = 200
     batch_size = 200
 
     user_encoder.eval()
     test_dataset = ArticlesDatasetTest('ebnerd_testset')
-    validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
+    validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list, num_workers=4)
     outputs = []#np.empty(len(test_dataset), dtype=object)
     iteration = 0
-    
+    wandb.log({
+        'tjek': 1
+    })
     for batch in validation_loader:
         #start = time.time()
         k_batch = findMaxInviewInBatchTesting(batch)
@@ -79,6 +82,10 @@ def runOnTestSet(user_encoder, history_size, nlp):
         #print("Time for batch: ", time.time() - start)
         #start = time.time()
         batch_outputs = convertOutput(batch_outputs, batch)
+
+        wandb.log({
+            'tjek2': 1
+        })
         
         for i in range(0, len(batch)):
             impression_id, _, _, inview_ids = batch[i]
@@ -104,6 +111,6 @@ h = 16
 dropout = 0.2
 history_size = 10
 user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
-user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE))
+user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE, weights_only=True))
 with torch.no_grad():
     runOnTestSet(user_encoder, history_size, nlp)

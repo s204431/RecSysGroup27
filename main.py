@@ -90,11 +90,10 @@ if __name__ == '__main__':
     torch.manual_seed(42)
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train')
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
-    #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list, num_workers=4)
     validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list, num_workers=4)
     user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
-    #user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
     optimizer = torch.optim.Adam(user_encoder.parameters(), lr=learning_rate)
     criterion = nn.NLLLoss()
@@ -112,6 +111,7 @@ if __name__ == '__main__':
     )    
 
     for i in range(0, num_epochs):
+        
         accuracies = []
         losses = []
         train_outputs = []
