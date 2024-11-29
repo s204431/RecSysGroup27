@@ -67,28 +67,3 @@ def calculate_accuracy(labels: torch.Tensor, predictions: torch.Tensor, threshol
     ]
     return float(torch.tensor(accuracies).mean())
 
-start = time.time()
-
-# Eksempeldata med padding (-1)
-labels = torch.tensor([
-    [1, 1, 0, -1],
-    [1, 0, 0, 0],
-    [0, 1, -1, -1] # Her er -1 padding
-])
-
-predictions = torch.tensor([
-    [0.18, 0.7, 0.1, -1],
-    [0.18, 0.2, 0.1, 0.1],
-    [0.3, 0.2, -1, -1]  # Her er samme størrelse som labels
-])
-
-# Beregn metrikker
-auc = calculate_auc(labels, predictions)
-accuracy = calculate_accuracy(labels, predictions)
-end = time.time()
-
-#print('time', end - start)
-
-print(f"AUC: {auc:.4f}")
-print(f"Accuracy: {accuracy:.4f}")
-

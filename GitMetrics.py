@@ -141,14 +141,6 @@ def convert_to_binary(y_pred: np.ndarray, threshold: float):
     y_pred[y_pred < threshold] = 0
     return y_pred
 
-metrics = MetricEvaluator(
-    labels= [ [1, 1, 0], [1, 0, 0, 0], [0, 1]],
-    predictions=[[0.18, 0.7, 0.1], [0.18, 0.2, 0.1, 0.1], [0.3, 0.2]],
-    metric_functions=[AucScore(), AccuracyScore()],
-)
-print(metrics.evaluate())
-print('here')
-
 
 
 
