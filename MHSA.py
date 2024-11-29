@@ -16,6 +16,8 @@ import zipfile
 from huggingface_hub import hf_hub_download
 from NewsEmbedder import NewsEmbedder
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 class MultiHeadedAttention(nn.Module):
     """A simple Multi-head attention layer."""
     def __init__(self, h, d_model, d_model_out, dropout=0.1):
@@ -34,8 +36,8 @@ class MultiHeadedAttention(nn.Module):
     """MULTI-HEADED SELF_ATTENTION"""
     def attention(self, query, key, value, mask=None, dropout=None):
         "Compute 'Scaled Dot Product Attention'"
-        d_k = torch.tensor(query.size(-1))
-        scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(d_k)
+        #d_k = torch.tensor(query.size(-1))
+        scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(self.d_k)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -math.inf)
         p_attn = nn.functional.softmax(scores, dim = -1)

@@ -20,8 +20,8 @@ class UserEncoder(nn.Module):
         self.h = h
         self.dropout = dropout
         self.d_model_out = 256
-        self.news_encoder = NewsEncoder(d_model_out=self.d_model_out, h=self.h, dropout=self.dropout)
-        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0)
+        self.news_encoder = NewsEncoder(d_model_out=self.d_model_out, h=self.h, dropout=self.dropout).to(DEVICE)
+        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0).to(DEVICE)
 
     def forward(self, history, targets):
         batch_size = history.shape[0]
