@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 import time
 import numpy as np
+from UserEncoder import UserEncoder
+import spacy
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -51,8 +53,6 @@ def make_batch(batch, dataset, nlp, k, history_size):
     batch_targets = torch.tensor(batch_targets).to(DEVICE)
     return batch_history, batch_targets
 
-history_size = 10
-
 def runOnTestSet(user_encoder, history_size, nlp):
     log_every = 50
     batch_size = 200
@@ -87,4 +87,14 @@ def runOnTestSet(user_encoder, history_size, nlp):
                 #print("Test iteration", iteration)
                 #break
     saveToFile(outputs)
-        
+
+
+nlp = spacy.load("da_core_news_md")  # Load danish model
+
+h = 16
+dropout = 0.2
+history_size = 10
+user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
+user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE))
+with torch.no_grad():
+    runOnTestSet(user_encoder, history_size, nlp)

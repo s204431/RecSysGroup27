@@ -6,7 +6,7 @@ from UserEncoder import UserEncoder
 from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
-from Testing import runOnTestSet
+#from Testing import runOnTestSet
 import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
@@ -70,7 +70,7 @@ h = 16
 dropout = 0.2
 
 learning_rate = 1e-3
-num_epochs = 1
+num_epochs = 100 #Not really used
 
 validate_every = 50
 validation_size = 1000
@@ -80,10 +80,11 @@ history_size = 10
 
 dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
-val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
+#val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
 train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
 validation_loader = DataLoader(dataset, batch_size=validation_size, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
+#user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
 optimizer = torch.optim.Adam(user_encoder.parameters(), lr=learning_rate)
 criterion = nn.NLLLoss()
@@ -147,6 +148,8 @@ for i in range(0, num_epochs):
     if n_batches_finished >= max_batches:
         break
 
+torch.save(user_encoder.state_dict(), 'model.pth')
+
 #print("Validation accuracies: ", validation_accuracies)
 #print("Validation aucs: ", validation_aucs)
 
@@ -154,7 +157,8 @@ for i in range(0, num_epochs):
 dataset = None
 val_dataset = None
 train_loader = None
+validation_loader = None
 
 #Testing
-with torch.no_grad():
-    runOnTestSet(user_encoder, history_size, nlp)
+#with torch.no_grad():
+    #runOnTestSet(user_encoder, history_size, nlp)
