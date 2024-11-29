@@ -40,7 +40,7 @@ def getData(user_id, inview, clicked, dataset, history_size, k, negative_samplin
     history = getRandomN(history, history_size)
     return history, targets, gt_position
 
-def make_batch(batch, k, negative_sampling=True):
+def make_batch(batch, dataset, k, negative_sampling=True):
     max_title_size = 20
     vocab_size = nlp.vocab.vectors.shape[0]
     batch_history = []
@@ -82,9 +82,9 @@ dataset = ArticlesDatasetTraining(dataset_name, 'train')
 val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
 #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
 train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
-validation_loader = DataLoader(dataset, batch_size=validation_size, shuffle=True, collate_fn=list)
+validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list)
 user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
-#user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
+user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
 optimizer = torch.optim.Adam(user_encoder.parameters(), lr=learning_rate)
 criterion = nn.NLLLoss()
@@ -98,7 +98,7 @@ for i in range(0, num_epochs):
     train_gt_positions = []
     for batch in train_loader:
 
-        batch_history, batch_targets, batch_gtpositions = make_batch(batch, k)
+        batch_history, batch_targets, batch_gtpositions = make_batch(batch, dataset, k)
         batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
         batch_targets = batch_gtpositions
 
@@ -124,7 +124,7 @@ for i in range(0, num_epochs):
                 batch_targets = []
                 
                 k_batch = findMaxInviewInBatch(batch)
-                batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, negative_sampling=False)
+                batch_history, batch_targets, batch_gtpositions = make_batch(batch, val_dataset, k_batch, negative_sampling=False)
                 with torch.no_grad():
                     batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
                 batch_targets = batch_gtpositions
@@ -154,10 +154,10 @@ torch.save(user_encoder.state_dict(), 'model.pth')
 #print("Validation aucs: ", validation_aucs)
 
 #Release train and validation datasets from memory before testing
-dataset = None
-val_dataset = None
-train_loader = None
-validation_loader = None
+#dataset = None
+#val_dataset = None
+#train_loader = None
+#validation_loader = None
 
 #Testing
 #with torch.no_grad():
