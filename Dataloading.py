@@ -22,8 +22,8 @@ def find_position(row):
         return int(inview_list.index(clicked_value)) 
     return None
 
-def replace_ids_with_titles(article_ids, article_dict):
-    return [article_dict.get(article_id) for article_id in article_ids]
+def replace_ids_with_titles(article_ids, article_dict, subtitle_dict):
+    return [(article_dict.get(article_id) + " " + subtitle_dict.get(article_id)) for article_id in article_ids]
 
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, type): #Type is "train", "validation"
@@ -34,13 +34,15 @@ class ArticlesDatasetTraining(Dataset):
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type, "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed']]
-        df_articles = df_articles[['article_id', 'title']]
+        df_articles = df_articles[['article_id', 'title', 'subtitle']]
         df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked']]
         self.df_data = df_behaviors
-        self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
-        df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict)
-        df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.article_dict)
+        self.title_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
+        self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
+        df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.title_dict, subtitle_dict=self.subtitle_dict)
+        df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.title_dict, subtitle_dict=self.subtitle_dict)
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
+
         print("Time to load data: ", time.time() - start)
 
 
