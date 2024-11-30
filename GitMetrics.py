@@ -111,7 +111,7 @@ class AucScore(Metric):
             [
                 roc_auc_score(each_labels, each_preds)
                 for each_labels, each_preds in tqdm(
-                    zip(y_true, y_pred), ncols=80, total=len(y_true), desc="AUC"
+                    zip(y_true, y_pred), ncols=80, total=len(y_true), desc="AUC", disable=True
                 )
             ]
         )
@@ -129,7 +129,7 @@ class AccuracyScore(Metric):
                     each_labels, convert_to_binary(each_preds, self.threshold)
                 )
                 for each_labels, each_preds in tqdm(
-                    zip(y_true, y_pred), ncols=80, total=len(y_true), desc="AUC"
+                    zip(y_true, y_pred), ncols=80, total=len(y_true), desc="AUC", disable=True
                 )
             ]
         )

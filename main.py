@@ -22,20 +22,19 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 #Parameters
 dataset_name = 'ebnerd_small'
 k = 4
-batch_size = 64
 h = 16
 dropout = 0.2
+
+train_batch_size = 64
+val_batch_size = 64
 
 learning_rate = 1e-3
 num_epochs = 100 #Not really used
 
-validate_every = 200
-validation_size = 200
-max_batches = 5000 #Use this if you want to end the training early
+
 
 history_size = 10
 
-icount = 0
 
 
 def accuracy(outputs, targets):
@@ -91,19 +90,20 @@ if __name__ == '__main__':
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train')
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list, num_workers=4)
-    validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=list, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=True, collate_fn=list, num_workers=4)
     user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
 
     optimizer = torch.optim.Adam(user_encoder.parameters(), lr=learning_rate)
     criterion = nn.NLLLoss()
-    user_encoder.train()
+   
     n_batches_finished = 0
     auc_metric = AucScore()
+    acc_metric =  AccuracyScore()
 
     wandb.init(
         project="News_prediction",  # Set your W&B project name
-        name='test1',        # Name of the experiment
+        name='mads_run',        # Name of the experiment
         config={                     # Log hyperparameters
             "num_epochs": num_epochs,
             "learning_rate": optimizer.param_groups[0]['lr']
@@ -111,12 +111,19 @@ if __name__ == '__main__':
     )    
 
     for i in range(0, num_epochs):
+
+        train_accuracies = 0.0
+        train_losses = 0.0
+        train_aucscores = 0.0
+        train_count = 0
+
+        user_encoder.train()
         
-        accuracies = []
-        losses = []
-        train_outputs = []
-        train_gt_positions = []
+
         for batch in train_loader:
+
+            train_outputs = []
+            train_gt_positions = []            
 
             batch_history, batch_targets, batch_gtpositions = make_batch(batch, k, train_dataset)
             batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
@@ -132,68 +139,65 @@ if __name__ == '__main__':
                 train_outputs.append(output)
             for target in targets_np:
                 train_gt_positions.append(target)
-            acc = accuracy(batch_outputs, batch_targets)
-            accuracies.append(acc)
-            losses.append(loss.cpu().detach().numpy())
-            n_batches_finished += 1
-            if n_batches_finished % validate_every == 0:
-                user_encoder.eval()
-                for batch in validation_loader:
-                    #print("Validation number", n_batches_finished//validate_every)
-                    batch_outputs = []
-                    batch_targets = []
+            
+            train_losses += loss.cpu().detach().numpy()
 
-                    k_batch = findMaxInviewInBatch(batch)
-                    batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, val_dataset, negative_sampling=False)
-                    with torch.no_grad():
-                        batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
-                    batch_targets = batch_gtpositions
-                    batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
-
-                    print('break')
-                    break
-
-
-                val_aucscore = auc_metric.calculate(batch_targets, batch_outputs)
-                train_aucscore = auc_metric.calculate(train_gt_positions, train_outputs)
-
-                wandb.log({
-                    "Validation auc: ": val_aucscore,
-                    "Train auc: ": train_aucscore,
-                    "Average train loss: ": sum(losses)/len(losses),
-                    "Average train accuracy: ": sum(accuracies)/len(accuracies),
-                    "icount": icount,
-                    "epochs": i,
-                    " n_batches_finished":  n_batches_finished
-                })
-                
-                icount += 1
-                #print("Validation auc: ", val_aucscore)
-                #print("Train auc: ", train_aucscore)
-                #print("Average train loss: ", sum(losses)/len(losses))
-                #print("Average train accuracy: ", sum(accuracies)/len(accuracies))
-                #print()
-                #accuracies = []
-
-                losses = []
-                train_outputs = []
-                train_gt_positions = []
-                user_encoder.train()
-            if n_batches_finished >= max_batches:
-                break
-        if n_batches_finished >= max_batches:
-            break
+            train_accuracies += acc_metric.calculate(train_gt_positions, train_outputs)
+            train_aucscores += auc_metric.calculate(train_gt_positions, train_outputs)
+            train_count += 1
 
     
-    torch.save(user_encoder.state_dict(), 'model.pth')
-    #print("Validation accuracies: ", validation_accuracies)
-    #print("Validation aucs: ", validation_aucs)
+        wandb.log({
+            "epoch": i,
+            "train_count": train_count,
+            "Train auc: ": train_aucscores/train_count,
+            "Average train loss: ": train_losses/train_count,
+            "Average train accuracy: ": train_accuracies/train_count
+            })
 
-    #Release train and validation datasets from memory before testing
-    dataset = None
-    val_dataset = None
-    train_loader = None
-    validation_loader = None
+
+        val_accuracies = 0.0
+        val_losses = 0.0
+        val_aucscores = 0.0
+        val_count = 0
+
+        user_encoder.eval()
+
+        for batch in val_loader:
+
+            batch_outputs = []
+            batch_targets = []
+
+            k_batch = findMaxInviewInBatch(batch)
+            batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, val_dataset, negative_sampling=False)
+            with torch.no_grad():
+                batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+                loss = criterion(batch_outputs, batch_gtpositions)
+
+            val_losses += loss.cpu().detach().numpy()
+            
+            batch_targets = batch_gtpositions
+            batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
+
+            val_accuracies += acc_metric.calculate(batch_targets, batch_outputs)
+            val_aucscores += auc_metric.calculate(batch_targets, batch_outputs)
+            val_count += 1
+
+
+        wandb.log({
+            "epoch": i,
+            "val_count": val_count,
+            "val auc: ": val_aucscores/val_count,
+            "Average val loss: ": val_losses/val_count,
+            "Average val accuracy: ": val_accuracies/val_count
+        })
+          
+        filename = f'Models/model{i}.pth'
+        torch.save(user_encoder.state_dict(), filename)
+
+    
+
+
 
     #Testing
     #with torch.no_grad():
