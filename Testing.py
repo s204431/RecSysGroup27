@@ -35,8 +35,7 @@ def getData(user_id, inview, dataset, history_size):
     history = getRandomN(history, history_size)
     return history, inview
 
-def make_batch(batch, dataset, nlp, k, history_size):
-    max_title_size = 20
+def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
     vocab_size = nlp.vocab.vectors.shape[0]
     batch_history = []
     batch_targets = []
@@ -54,12 +53,12 @@ def make_batch(batch, dataset, nlp, k, history_size):
     batch_targets = torch.tensor(batch_targets).to(DEVICE)
     return batch_history, batch_targets
 
-def runOnTestSet(user_encoder, history_size, nlp):
+def runOnTestSet(user_encoder, history_size, max_title_size, nlp):
     log_every = 50
     batch_size = 200
 
     user_encoder.eval()
-    test_dataset = ArticlesDatasetTest('ebnerd_testset')
+    test_dataset = ArticlesDatasetTest('ebnerd_testset', nlp)
     validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
     outputs = []
     iteration = 0
@@ -67,7 +66,7 @@ def runOnTestSet(user_encoder, history_size, nlp):
     for batch in validation_loader:
         k_batch = findMaxInviewInBatchTesting(batch)
         #start = time.time()
-        batch_history, batch_targets = make_batch(batch, test_dataset, nlp, k_batch, history_size)
+        batch_history, batch_targets = make_batch(batch, test_dataset, nlp, k_batch, history_size, max_title_size)
         #print("Time to make batch: ", time.time() - start)
         #start = time.time()
         batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
@@ -95,10 +94,10 @@ def runOnTestSet(user_encoder, history_size, nlp):
 
 nlp = spacy.load("da_core_news_md")  # Load danish model
 
-h = 16
+"""h = 16
 dropout = 0.2
 history_size = 10
 user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
 user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE))
 with torch.no_grad():
-    runOnTestSet(user_encoder, history_size, nlp)
+    runOnTestSet(user_encoder, history_size, nlp)"""

@@ -4,12 +4,8 @@ import numpy as np
 import time
 import pandas as pd
 import Utils
-import spacy
 
 precompute_token_dicts = True
-
-if precompute_token_dicts:
-    nlp = spacy.load("da_core_news_md")
 
 def flatten(lst):
     flattened_list = []
@@ -33,7 +29,7 @@ def replace_ids_with_titles(article_ids, article_dict, subtitle_dict):
     return [f"{article_dict.get(article_id, '')} {subtitle_dict.get(article_id, '')}" for article_id in article_ids]
 
 class ArticlesDatasetTraining(Dataset):
-    def __init__(self, DATASET, type): #Type is "train", "validation"
+    def __init__(self, DATASET, type, nlp): #Type is "train", "validation"
         start = time.time()
         PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
@@ -74,7 +70,7 @@ class ArticlesDatasetTraining(Dataset):
         return row['user_id'], row['article_titles_inview'], row['article_titles_clicked']
 
 class ArticlesDatasetTest(Dataset):
-    def __init__(self, DATASET):
+    def __init__(self, DATASET, nlp):
         start = time.time()
         PATH = Path(__file__).parent.resolve().joinpath("./ebnerd_data")
     
