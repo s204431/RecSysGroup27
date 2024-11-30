@@ -27,8 +27,10 @@ dropout = 0.2
 learning_rate = 1e-3
 num_epochs = 100 #Not really used
 
-validate_every = 50
-validation_size = 200
+validate_every = 200 #How many train batches between validations
+validation_batch_size = 200 #The batch size for validation
+n_validation_batches = 50 #How many batches to run for each validation
+
 max_batches = 5000 #Use this if you want to end the training early
 
 history_size = 10
@@ -81,6 +83,30 @@ def make_batch(batch, k, dataset, negative_sampling=True):
     batch_gtpositions = torch.tensor(batch_gtpositions).to(DEVICE)
     return batch_history, batch_targets, batch_gtpositions
 
+def testOnWholeDataset(user_encoder, dataset_name, dataset_type):
+    log_every = 50
+    batch_size = 200
+    user_encoder.eval()
+    test_dataset = ArticlesDatasetTraining(dataset_name, dataset_type)
+    dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
+    outputs = []
+    targets = []
+    iteration = 0
+    for batch in dataloader:
+        k_batch = findMaxInviewInBatch(batch)
+        batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, test_dataset, negative_sampling=False)
+        batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+        batch_targets = batch_gtpositions
+        batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
+        for i in range(0, len(batch)):
+            outputs.append(batch_outputs[i])
+            targets.append(batch_targets[i])
+        iteration += 1
+        if iteration % log_every == 0:
+                print("Finished: ", len(outputs))
+    auc_metric = AucScore()
+    auc_score = auc_metric.calculate(targets, outputs)
+    print("Final AUC score on whole dataset: ", auc_score)
 
 if __name__ == '__main__':
 
@@ -88,7 +114,7 @@ if __name__ == '__main__':
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
     #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
-    validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list)
+    validation_loader = DataLoader(val_dataset, batch_size=validation_batch_size, shuffle=True, collate_fn=list)
     user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
     #user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
@@ -122,10 +148,14 @@ if __name__ == '__main__':
             accuracies.append(acc)
             losses.append(loss.cpu().detach().numpy())
             n_batches_finished += 1
-            if n_batches_finished % validate_every == 0:
+            if n_batches_finished % validate_every == 0 or n_batches_finished == 1: #We also validate after the first batch to see amount of learning at the start
                 user_encoder.eval()
+                n_batches_finished_val = 0
+                val_outputs = []
+                val_targets = []
+                print("Validation number", n_batches_finished//validate_every)
+                print("Validation datapoints: ", (n_validation_batches*validation_batch_size))
                 for batch in validation_loader:
-                    print("Validation number", n_batches_finished//validate_every)
                     batch_outputs = []
                     batch_targets = []
 
@@ -135,9 +165,14 @@ if __name__ == '__main__':
                         batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
                     batch_targets = batch_gtpositions
                     batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
-                    break
+                    for i in range(0, len(batch)):
+                        val_outputs.append(batch_outputs[i])
+                        val_targets.append(batch_targets[i])
+                    n_batches_finished_val += 1
+                    if (n_batches_finished_val >= n_validation_batches):
+                        break
 
-                val_aucscore = auc_metric.calculate(batch_targets, batch_outputs)
+                val_aucscore = auc_metric.calculate(val_targets, val_outputs)
                 train_aucscore = auc_metric.calculate(train_gt_positions, train_outputs)
                 print("Validation auc: ", val_aucscore)
                 print("Train auc: ", train_aucscore)
@@ -155,16 +190,6 @@ if __name__ == '__main__':
             break
 
     torch.save(user_encoder.state_dict(), 'model.pth')
-
-    #print("Validation accuracies: ", validation_accuracies)
-    #print("Validation aucs: ", validation_aucs)
-
-    #Release train and validation datasets from memory before testing
-    dataset = None
-    val_dataset = None
-    train_loader = None
-    validation_loader = None
-
-    #Testing
-    #with torch.no_grad():
-        #runOnTestSet(user_encoder, history_size, nlp)
+    
+    with torch.no_grad(): #Test on whole validation set
+        testOnWholeDataset(user_encoder, "ebnerd_small", "validation")
