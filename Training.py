@@ -11,6 +11,7 @@ import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
 from Utils import getRandomN, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
+import time
 
 nlp = spacy.load("da_core_news_md")  # Load danish model
 
@@ -27,7 +28,7 @@ learning_rate = 1e-3
 num_epochs = 100 #Not really used
 
 validate_every = 50
-validation_size = 1000
+validation_size = 200
 max_batches = 5000 #Use this if you want to end the training early
 
 history_size = 10
@@ -68,10 +69,10 @@ def make_batch(batch, k, dataset, negative_sampling=True):
         history, targets, gt_position = getData(user_id, inview, clicked, dataset, history_size, k, negative_sampling)
         if history != None:
 
-            history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
+            #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
             batch_history.append(pad_token_list(history, max_title_size, vocab_size, history_size))
 
-            targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
+            #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
             batch_targets.append(pad_token_list(targets, max_title_size, vocab_size, k+1))
 
             batch_gtpositions.append(int(gt_position))
@@ -86,8 +87,8 @@ if __name__ == '__main__':
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train')
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation')
     #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list, num_workers=4)
-    validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list, num_workers=4)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
+    validation_loader = DataLoader(val_dataset, batch_size=validation_size, shuffle=True, collate_fn=list)
     user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
     #user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 

@@ -6,7 +6,7 @@ import pandas as pd
 import Utils
 import spacy
 
-precompute_token_dicts = False
+precompute_token_dicts = True
 
 if precompute_token_dicts:
     nlp = spacy.load("da_core_news_md")
@@ -50,8 +50,10 @@ class ArticlesDatasetTraining(Dataset):
         #df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
         if precompute_token_dicts:
-            self.combined_token_dict = {article_id: Utils.replace_titles_with_tokens(self.combined_dict.get(article_id), nlp=nlp, max_vocab_size=20000) for article_id in self.combined_dict}
-        mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
+            self.combined_dict = {article_id: Utils.replace_titles_with_tokens([self.combined_dict.get(article_id)], nlp=nlp, max_vocab_size=len(nlp.vocab.vectors))[0] for article_id in self.combined_dict}
+            mapping = lambda article_ids: [self.combined_dict.get(article_id, '') for article_id in article_ids]
+        else:
+            mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
         df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(mapping)
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
@@ -89,11 +91,12 @@ class ArticlesDatasetTest(Dataset):
         #df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
         if precompute_token_dicts:
-            self.combined_token_dict = {article_id: Utils.replace_titles_with_tokens(self.combined_dict.get(article_id), nlp=nlp, max_vocab_size=20000) for article_id in self.combined_dict}
-        mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
+            self.combined_dict = {article_id: Utils.replace_titles_with_tokens([self.combined_dict.get(article_id)], nlp=nlp, max_vocab_size=len(nlp.vocab.vectors))[0] for article_id in self.combined_dict}
+            mapping = lambda article_ids: [self.combined_dict.get(article_id, '') for article_id in article_ids]
+        else:
+            mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
         df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(mapping)
-        
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
@@ -109,7 +112,7 @@ class ArticlesDatasetTest(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['impression_id'], row['user_id'], row['article_titles_inview'], row['article_ids_inview']
+        return row['impression_id'], row['user_id'], row['article_titles_inview']
 
 '''
 dataset = ArticlesDatasetTraining('ebnerd_small', 'train')

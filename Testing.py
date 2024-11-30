@@ -40,13 +40,14 @@ def make_batch(batch, dataset, nlp, k, history_size):
     vocab_size = nlp.vocab.vectors.shape[0]
     batch_history = []
     batch_targets = []
-    for _, user_id, inview, _ in batch:
+    for _, user_id, inview in batch:
         history, targets = getData(user_id, inview, dataset, history_size)
+        #print(history, targets)
 
-        history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
+        #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
         batch_history.append(pad_token_list(history, max_title_size, vocab_size, history_size))
 
-        targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
+        #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
         batch_targets.append(pad_token_list(targets, max_title_size, vocab_size, k+1))
 
     batch_history = torch.tensor(batch_history).to(DEVICE)
@@ -60,28 +61,31 @@ def runOnTestSet(user_encoder, history_size, nlp):
     user_encoder.eval()
     test_dataset = ArticlesDatasetTest('ebnerd_testset')
     validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
-    outputs = []#np.empty(len(test_dataset), dtype=object)
+    outputs = []
     iteration = 0
     
     for batch in validation_loader:
-        #start = time.time()
         k_batch = findMaxInviewInBatchTesting(batch)
+        #start = time.time()
         batch_history, batch_targets = make_batch(batch, test_dataset, nlp, k_batch, history_size)
         #print("Time to make batch: ", time.time() - start)
         #start = time.time()
         batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+        #batch_outputs = torch.tensor([[random.random() for _ in range(k_batch)] for _ in batch_history])
         #print("Time for batch: ", time.time() - start)
         #start = time.time()
+        batch_outputs = batch_outputs.cpu().numpy()
         batch_outputs = convertOutput(batch_outputs, batch)
         
         for i in range(0, len(batch)):
-            impression_id, _, _, inview_ids = batch[i]
+            impression_id, _, inview = batch[i]
             output = batch_outputs[i]
-            sorted_output = [x for _, x in sorted(zip(output, inview_ids.tolist()), reverse=True)]
-            #outputs[index] = [[impression_id], sorted_output]
+            sorted_output = [x for _, x in sorted(zip(output, range(1, len(inview)+1)), reverse=True)]
             outputs.append([[impression_id], sorted_output])
         iteration += 1
+
         #print("Time to convert output: ", time.time() - start)
+
         if iteration % log_every == 0:
                 print("Finished: ", len(outputs))
                 #print("Test iteration", iteration)

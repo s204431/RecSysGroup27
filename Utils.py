@@ -42,7 +42,7 @@ def findMaxInviewInBatch(batch):
 
 def findMaxInviewInBatchTesting(batch):
     maximum = 0
-    for _, _, inview, _ in batch:
+    for _, _, inview in batch:
         if len(inview) > maximum:
             maximum = len(inview)
     return maximum
@@ -57,10 +57,10 @@ def convertgtPositionsToVec(batch_gt_positions, length):
 
 def convertOutput(batch_output, batch):
     outputs = []
-    for i in range(0, batch_output.shape[0]):
+    for i in range(0, len(batch_output)):
         output = batch_output[i]
-        _, _, _, inview = batch[i]
-        output = output[:len(inview)].cpu().numpy()
+        _, _, inview = batch[i]
+        output = output[:len(inview)]
         outputs.append(output)
         #outputs.append(np.exp(output)/sum(np.exp(output))) #Softmax
     return outputs
