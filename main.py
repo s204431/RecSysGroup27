@@ -24,15 +24,15 @@ h = 16
 #user_encoder = UserEncoder(4, 0.2)
 
 def main():
-    user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
+    user_encoder = UserEncoder(nlp, h=h, dropout=dropout).to(DEVICE)
 
     if load_model:
         user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE))
     
-    #tuneParameters(user_encoder) #Comment this out if you do not want to tune parameters
+    #tuneParameters(nlp) #Comment this out if you do not want to tune parameters
 
     if not testing:
-        train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_title_size, nlp)
+        train(user_encoder, weight_decay, learning_rate, history_size, max_title_size, nlp)
 
         if save_model:
             torch.save(user_encoder.state_dict(), 'model.pth')

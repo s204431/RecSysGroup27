@@ -20,7 +20,7 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 class MultiHeadedAttention(nn.Module):
     """A simple Multi-head attention layer."""
-    def __init__(self, h, d_model, d_model_out, dropout=0.1):
+    def __init__(self, h, d_model, d_model_out, dropout=0.0):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model_out % h == 0

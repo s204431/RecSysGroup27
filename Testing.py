@@ -1,12 +1,12 @@
 from Dataloading import ArticlesDatasetTest
 import random
-from Utils import getRandomN, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatchTesting, convertOutput
+from Utils import sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatchTesting, convertOutput
 import torch
 from torch.utils.data import DataLoader
 import time
 import numpy as np
 from UserEncoder import UserEncoder
-import spacy
+import scipy.stats as ss
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -30,9 +30,16 @@ def saveToFile(outputs):
             print("Saved lines: ", iteration)
     file.close()
 
+def convertLines():
+    with open('predictions.txt', 'rb') as file:
+        content = file.read()
+    content = content.replace(b'\r\n', b'\n')
+    with open("predictions_2.txt", "wb") as file:
+        file.write(content)
+
 def getData(user_id, inview, dataset, history_size):
     history = dataset.history_dict[user_id]
-    history = getRandomN(history, history_size)
+    history = sampleHistory(history, history_size)
     return history, inview
 
 def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
@@ -79,8 +86,8 @@ def runOnTestSet(user_encoder, history_size, max_title_size, nlp):
         for i in range(0, len(batch)):
             impression_id, _, inview = batch[i]
             output = batch_outputs[i]
-            sorted_output = [x for _, x in sorted(zip(output, range(1, len(inview)+1)), reverse=True)]
-            outputs.append([[impression_id], sorted_output])
+            ranking = ss.rankdata(-output, method="ordinal").astype(int).tolist()
+            outputs.append([[impression_id], ranking])
         iteration += 1
 
         #print("Time to convert output: ", time.time() - start)
@@ -91,8 +98,7 @@ def runOnTestSet(user_encoder, history_size, max_title_size, nlp):
                 #break
     saveToFile(outputs)
 
-
-nlp = spacy.load("da_core_news_md")  # Load danish model
+#nlp = spacy.load("da_core_news_md")  # Load danish model
 
 """h = 16
 dropout = 0.2

@@ -10,7 +10,7 @@ from Dataloading import ArticlesDatasetTraining
 import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
-from Utils import getRandomN, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
+from Utils import sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
 import time
 import pandas as pd
 
@@ -33,7 +33,7 @@ validate_every = 200 #How many train batches between validations
 validation_batch_size = 200 #The batch size for validation
 n_validation_batches = 50 #How many batches to run for each validation
 
-max_batches = 10000 #Use this if you want to end the training early
+max_batches = 5000 #Use this if you want to end the training early
 
 #history_size = 20
 #max_title_size = 30
@@ -61,7 +61,7 @@ def getData(user_id, inview, clicked, dataset, history_size, k, negative_samplin
         targets = inview
     gt_position = random.randrange(0, len(targets)+1)
     targets.insert(gt_position, clicked)
-    history = getRandomN(history, history_size)
+    history = sampleHistory(history, history_size)
     return history, targets, gt_position
 
 def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sampling=True):
@@ -111,7 +111,7 @@ def testOnWholeDataset(user_encoder, dataset_name, dataset_type, history_size, m
     print("Final AUC score on whole dataset: ", auc_score)
     return auc_score
 
-def train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_title_size, nlp):
+def train(user_encoder, weight_decay, learning_rate, history_size, max_title_size, nlp):
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', nlp)
     #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
@@ -134,19 +134,18 @@ def train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_
 
             batch_history, batch_targets, batch_gtpositions = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
             batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
-            batch_targets = batch_gtpositions
 
-            loss = criterion(batch_outputs, batch_targets)
+            loss = criterion(batch_outputs, batch_gtpositions)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            outputs_np = batch_outputs.cpu().detach().numpy()
-            targets_np = convertgtPositionsToVec(batch_targets, k+1)
+            outputs_np = torch.softmax(batch_outputs, dim=1).cpu().detach().numpy()
+            targets_np = convertgtPositionsToVec(batch_gtpositions, k+1)
             for output in outputs_np:
                 train_outputs.append(output)
             for target in targets_np:
                 train_gt_positions.append(target)
-            acc = accuracy(batch_outputs, batch_targets)
+            acc = accuracy(batch_outputs, batch_gtpositions)
             accuracies.append(acc)
             losses.append(loss.cpu().detach().numpy())
             n_batches_finished += 1
@@ -154,7 +153,8 @@ def train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_
                 user_encoder.eval()
                 n_batches_finished_val = 0
                 val_outputs = []
-                val_targets = []
+                val_gtpositions = []
+                val_loss = 0
                 print("Validation number", n_batches_finished//validate_every)
                 print("Validation datapoints: ", (n_validation_batches*validation_batch_size))
                 for batch in validation_loader:
@@ -165,18 +165,19 @@ def train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_
                     batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
                     with torch.no_grad():
                         batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
-                    batch_targets = batch_gtpositions
-                    batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
+                        val_loss += criterion(batch_outputs, batch_gtpositions).cpu().numpy()
+                    batch_outputs, batch_gtpositions = convertOutputAndgtPositions(batch_outputs, batch_gtpositions, batch)
                     for i in range(0, len(batch)):
                         val_outputs.append(batch_outputs[i])
-                        val_targets.append(batch_targets[i])
+                        val_gtpositions.append(batch_gtpositions[i])
                     n_batches_finished_val += 1
                     if (n_batches_finished_val >= n_validation_batches):
                         break
 
-                val_aucscore = auc_metric.calculate(val_targets, val_outputs)
+                val_aucscore = auc_metric.calculate(val_gtpositions, val_outputs)
                 train_aucscore = auc_metric.calculate(train_gt_positions, train_outputs)
                 print("Validation auc: ", val_aucscore)
+                print("Validation loss: ", val_loss/len(val_outputs))
                 print("Train auc: ", train_aucscore)
                 print("Average train loss: ", sum(losses)/len(losses))
                 print("Average train accuracy: ", sum(accuracies)/len(accuracies))
@@ -194,7 +195,7 @@ def train(user_encoder, weight_decay, learning_rate, dropout, history_size, max_
     with torch.no_grad(): #Test on whole validation set
         return testOnWholeDataset(user_encoder, "ebnerd_small", "validation", history_size, max_title_size, nlp)
 
-def tuneParameters(user_encoder): #Tries different values of parameters and prints results
+def tuneParameters(nlp): #Tries different values of parameters and prints results
     print("Tuning...")
     weight_decays = [0.001, 0.0001]
     learning_rates = [1e-3]
@@ -207,7 +208,8 @@ def tuneParameters(user_encoder): #Tries different values of parameters and prin
             for dout in dropouts:
                 for hs in history_sizes:
                     for mts in max_titles_sizes:
-                        auc_score = train(user_encoder, wd, lr, dout, hs, mts)
+                        user_encoder = UserEncoder(nlp, 6, dout)
+                        auc_score = train(user_encoder, wd, lr, hs, mts)
                         new_row = {"weight_decay":wd, "learning_rate":lr, "dropout":dout, "history_size":hs, "max_titles_size":mts, "AUC_Score":auc_score}
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                         df.to_excel("tuning2.xlsx")

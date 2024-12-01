@@ -6,12 +6,23 @@ def getLastN(lst, N):
         return lst
     else:
         return lst[-N:]
+    
+def getFirstN(lst, N):
+    if len(lst) < N:
+        return lst
+    else:
+        return lst[:N]
 
 def getRandomN(lst, N):
     if len(lst) < N:
         return lst
     else:
         return random.sample(lst, N)
+
+def sampleHistory(history, N):
+    return getRandomN(history, N)
+    #return getLastN(history, N)
+    #return getFirstN(history, N)
 
 def replace_titles_with_tokens(article_titles, nlp, max_vocab_size, batch_size=64):
     with nlp.select_pipes(enable="tokenizer"):
