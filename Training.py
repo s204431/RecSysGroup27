@@ -66,8 +66,9 @@ def getData(user_id, inview, clicked, impression_time, dataset, history_size, k,
     history = [history[i] for i in sample_indices]
     history_times = [history_times[i] for i in sample_indices]
     time_difference = impression_time - history_times
-    time_padding_list = [0.0] * (history_size - len(history_times))
+    time_padding_list = [99999] * (history_size - len(history_times))
     time_difference = time_difference.tolist() + time_padding_list
+    print(time_difference)
     return history, targets, gt_position, time_difference
 
 def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sampling=True):

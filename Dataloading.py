@@ -30,14 +30,12 @@ def replace_ids_with_titles(article_ids, article_dict, subtitle_dict):
     return [f"{article_dict.get(article_id, '')} {subtitle_dict.get(article_id, '')}" for article_id in article_ids]
 
 def encode_history_times(time_strings):
-    january_first_2023 = datetime.strptime("2023-01-01T00:00:00.000000", "%Y-%m-%dT%H:%M:%S.%f")
-    date_times = [datetime.strptime(str(time_string), "%Y-%m-%dT%H:%M:%S.%f") for time_string in time_strings]
-    return [divmod(((date_time - january_first_2023).total_seconds()), 60)[0] for date_time in date_times]
+    january_first_2023 = datetime(2023, 1, 1)
+    return [(datetime.fromisoformat(str(time_string)) - january_first_2023).total_seconds() / (60*60*24) for time_string in time_strings]
 
 def encode_impression_time(time_string):
-    january_first_2023 = datetime.strptime("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-    date_time = datetime.strptime(str(time_string), "%Y-%m-%d %H:%M:%S")
-    return divmod(((date_time - january_first_2023).total_seconds()), 60)[0]
+    january_first_2023 = datetime(2023, 1, 1)
+    return (datetime.fromisoformat(str(time_string)) - january_first_2023).total_seconds() / (60*60*24)
 
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, type, nlp): #Type is "train", "validation"
