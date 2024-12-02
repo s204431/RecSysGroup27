@@ -7,13 +7,20 @@ from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
 import wandb
-
 #from Testing import runOnTestSet
 import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
 from Utils import getRandomN, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
 
+
+
+####################################################
+# Har delt med 10                                  #
+# Fryser vægten for embeddings                     #
+# Ændre modelnavn                                  #
+# Ændre name i run wandb                           #
+####################################################
 
 nlp = spacy.load("da_core_news_md")  # Load danish model
 
@@ -103,8 +110,8 @@ if __name__ == '__main__':
 
     wandb.init(
         project="News_prediction",  # Set your W&B project name
-        name='mads_run',        # Name of the experiment
-        config={                     # Log hyperparameters
+        name='mads_run_frozen',     # Name of the experiment
+        config={                    # Log hyperparameters
             "num_epochs": num_epochs,
             "learning_rate": optimizer.param_groups[0]['lr']
         }
@@ -192,7 +199,7 @@ if __name__ == '__main__':
             "Average val accuracy: ": val_accuracies/val_count
         })
           
-        filename = f'Models/model{i}.pth'
+        filename = f'Models/model_frozen{i}.pth'
         torch.save(user_encoder.state_dict(), filename)
 
     

@@ -25,6 +25,7 @@ class NewsEmbedder(nn.Module):
         vectors = torch.tensor(data)
         self.embeddings = torch.nn.Embedding(vectors.shape[0], vectors.shape[1], padding_idx=vectors.shape[0]-1)
         self.embeddings.weight.data = vectors
+        self.embeddings.weight.requires_grad = False
 
     def forward(self, token_ids):
         vectors = self.embeddings(token_ids)
