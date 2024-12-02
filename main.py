@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from NRMS import NRMS
+from NRMSExtended import NRMSExtended
 import os
 import spacy
 from Training import train, tuneParameters
@@ -8,8 +9,8 @@ from Testing import runOnTestSet
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-load_model = True
-save_model = False
+load_model = False
+save_model = True
 testing = False
 
 nlp = spacy.load("da_core_news_md")  # Load danish model
@@ -23,7 +24,7 @@ h = 16
 
 
 def main():
-    model = NRMS(nlp, h=h, dropout=dropout).to(DEVICE)
+    model = NRMSExtended(nlp, h=h, dropout=dropout).to(DEVICE)
 
     if load_model:
         model.load_state_dict(torch.load('model.pth', map_location=DEVICE))

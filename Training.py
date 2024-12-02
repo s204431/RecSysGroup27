@@ -10,7 +10,7 @@ from Dataloading import ArticlesDatasetTraining
 import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
-from Utils import sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
+from Utils import sampleIndices, sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
 import time
 import pandas as pd
 
@@ -48,8 +48,9 @@ def accuracy(outputs, targets):
             nCorrect += 1
     return nCorrect/len(targets)
 
-def getData(user_id, inview, clicked, dataset, history_size, k, negative_sampling=True):
+def getData(user_id, inview, clicked, impression_time, dataset, history_size, k, negative_sampling=True):
     history = dataset.history_dict[user_id]
+    history_times = dataset.time_dict[user_id]
     clicked = clicked[0]
     if clicked in inview:
         inview.remove(clicked)
@@ -61,16 +62,22 @@ def getData(user_id, inview, clicked, dataset, history_size, k, negative_samplin
         targets = inview
     gt_position = random.randrange(0, len(targets)+1)
     targets.insert(gt_position, clicked)
-    history = sampleHistory(history, history_size)
-    return history, targets, gt_position
+    sample_indices = sampleIndices(history, history_size)
+    history = [history[i] for i in sample_indices]
+    history_times = [history_times[i] for i in sample_indices]
+    time_difference = impression_time - history_times
+    time_padding_list = [0.0] * (history_size - len(history_times))
+    time_difference = time_difference.tolist() + time_padding_list
+    return history, targets, gt_position, time_difference
 
 def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sampling=True):
     vocab_size = nlp.vocab.vectors.shape[0]
     batch_history = []
     batch_targets = []
     batch_gtpositions = []
-    for user_id, inview, clicked in batch:
-        history, targets, gt_position = getData(user_id, inview, clicked, dataset, history_size, k, negative_sampling)
+    batch_time_differences = []
+    for user_id, inview, clicked, impression_time in batch:
+        history, targets, gt_position, time_differences = getData(user_id, inview, clicked, impression_time, dataset, history_size, k, negative_sampling)
         if history != None:
 
             #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
@@ -80,10 +87,12 @@ def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sa
             batch_targets.append(pad_token_list(targets, max_title_size, vocab_size, k+1))
 
             batch_gtpositions.append(int(gt_position))
+            batch_time_differences.append(time_differences)
     batch_history = torch.tensor(batch_history).to(DEVICE)
     batch_targets = torch.tensor(batch_targets).to(DEVICE)
     batch_gtpositions = torch.tensor(batch_gtpositions).to(DEVICE)
-    return batch_history, batch_targets, batch_gtpositions
+    batch_time_differences = torch.tensor(batch_time_differences).to(DEVICE)
+    return batch_history, batch_targets, batch_gtpositions, batch_time_differences
 
 def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_title_size, nlp):
     log_every = 50
@@ -96,8 +105,8 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
     iteration = 0
     for batch in dataloader:
         k_batch = findMaxInviewInBatch(batch)
-        batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, history_size, max_title_size, test_dataset, nlp, negative_sampling=False)
-        batch_outputs = model(history=batch_history, targets=batch_targets)
+        batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, test_dataset, nlp, negative_sampling=False)
+        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
         batch_targets = batch_gtpositions
         batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
         for i in range(0, len(batch)):
@@ -114,8 +123,11 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
 def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp):
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', nlp)
+    #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
     validation_loader = DataLoader(val_dataset, batch_size=validation_batch_size, shuffle=True, collate_fn=list)
+    #model = NRMS(h=h, dropout=dropout).to(DEVICE)
+    #model.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     criterion = nn.NLLLoss()
@@ -129,8 +141,8 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
         train_gt_positions = []
         for batch in train_loader:
 
-            batch_history, batch_targets, batch_gtpositions = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
-            batch_outputs = model(history=batch_history, targets=batch_targets)
+            batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
+            batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
 
             loss = criterion(batch_outputs, batch_gtpositions)
             optimizer.zero_grad()
@@ -159,9 +171,9 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                     batch_targets = []
 
                     k_batch = findMaxInviewInBatch(batch)
-                    batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
+                    batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
                     with torch.no_grad():
-                        batch_outputs = model(history=batch_history, targets=batch_targets)
+                        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
                         val_loss += criterion(batch_outputs, batch_gtpositions).cpu().numpy()
                     batch_outputs, batch_gtpositions = convertOutputAndgtPositions(batch_outputs, batch_gtpositions, batch)
                     for i in range(0, len(batch)):
@@ -194,7 +206,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
 
 def tuneParameters(nlp): #Tries different values of parameters and prints results
     print("Tuning...")
-    weight_decays = [0.001, 0.0001]
+    weight_decays = [0.001, 0.00001]
     learning_rates = [1e-3]
     dropouts = [0.2]
     history_sizes = [20, 30]

@@ -9,7 +9,5 @@ class TimeEmbedder(nn.Module):
 
 
     def forward(self, news_vectors, times):
-        print(self.w)
-        print(self.b)
         times = self.w*times + self.b
         return news_vectors + times.unsqueeze(1)

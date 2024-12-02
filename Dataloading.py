@@ -4,6 +4,7 @@ import numpy as np
 import time
 import pandas as pd
 import Utils
+from datetime import datetime
 
 precompute_token_dicts = True
 
@@ -28,6 +29,16 @@ def find_position(row):
 def replace_ids_with_titles(article_ids, article_dict, subtitle_dict):
     return [f"{article_dict.get(article_id, '')} {subtitle_dict.get(article_id, '')}" for article_id in article_ids]
 
+def encode_history_times(time_strings):
+    january_first_2023 = datetime.strptime("2023-01-01T00:00:00.000000", "%Y-%m-%dT%H:%M:%S.%f")
+    date_times = [datetime.strptime(str(time_string), "%Y-%m-%dT%H:%M:%S.%f") for time_string in time_strings]
+    return [divmod(((date_time - january_first_2023).total_seconds()), 60)[0] for date_time in date_times]
+
+def encode_impression_time(time_string):
+    january_first_2023 = datetime.strptime("2023-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+    date_time = datetime.strptime(str(time_string), "%Y-%m-%d %H:%M:%S")
+    return divmod(((date_time - january_first_2023).total_seconds()), 60)[0]
+
 class ArticlesDatasetTraining(Dataset):
     def __init__(self, DATASET, type, nlp): #Type is "train", "validation"
         start = time.time()
@@ -36,9 +47,10 @@ class ArticlesDatasetTraining(Dataset):
         df_history   = pd.read_parquet(PATH.joinpath(DATASET, type, "history.parquet"))
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type, "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
-        df_history = df_history[['user_id','article_id_fixed']]
+        df_history = df_history[['user_id','article_id_fixed','impression_time_fixed']]
         df_articles = df_articles[['article_id', 'title', 'subtitle']]
-        df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked']]
+        df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked', 'impression_time']]
+        df_behaviors[['impression_time']] = df_behaviors[['impression_time']].map(encode_impression_time)
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
         self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
@@ -52,7 +64,9 @@ class ArticlesDatasetTraining(Dataset):
             mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
         df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(mapping)
+        df_history[['impression_time_fixed']] = df_history[['impression_time_fixed']].map(encode_history_times)
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
+        self.time_dict = pd.Series(df_history['impression_time_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
 
@@ -67,7 +81,7 @@ class ArticlesDatasetTraining(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['user_id'], row['article_titles_inview'], row['article_titles_clicked']
+        return row['user_id'], row['article_titles_inview'], row['article_titles_clicked'], row['impression_time']
 
 class ArticlesDatasetTest(Dataset):
     def __init__(self, DATASET, nlp):

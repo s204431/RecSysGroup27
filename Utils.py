@@ -19,10 +19,13 @@ def getRandomN(lst, N):
     else:
         return random.sample(lst, N)
 
-def sampleHistory(history, N):
+def sampleHistory(history, history_times, N):
     return getRandomN(history, N)
     #return getLastN(history, N)
     #return getFirstN(history, N)
+
+def sampleIndices(lst, N):
+    return getRandomN(range(len(lst)), N)
 
 def replace_titles_with_tokens(article_titles, nlp, max_vocab_size, batch_size=64):
     with nlp.select_pipes(enable="tokenizer"):
@@ -46,14 +49,14 @@ def pad_token_list_only_tokens(token_list, token_length, padding_value):
 
 def findMaxInviewInBatch(batch):
     maximum = 0
-    for _, inview, _ in batch:
+    for _, inview, _, _ in batch:
         if len(inview) > maximum:
             maximum = len(inview)
     return maximum
 
 def findMaxInviewInBatchTesting(batch):
     maximum = 0
-    for _, _, inview in batch:
+    for _, _, inview, _ in batch:
         if len(inview) > maximum:
             maximum = len(inview)
     return maximum
@@ -70,7 +73,7 @@ def convertOutput(batch_output, batch):
     outputs = []
     for i in range(0, len(batch_output)):
         output = batch_output[i]
-        _, _, inview = batch[i]
+        _, _, inview, _ = batch[i]
         output = output[:len(inview)]
         outputs.append(output)
         #outputs.append(np.exp(output)/sum(np.exp(output))) #Softmax
@@ -81,7 +84,7 @@ def convertOutputAndgtPositions(batch_output, batch_gt_positions, batch):
     targets = []
     for i in range(0, batch_output.shape[0]):
         output = batch_output[i]
-        _, inview, _ = batch[i]
+        _, inview, _, _ = batch[i]
         gt_position = batch_gt_positions[i]
         output = output[:len(inview)].cpu().numpy()
         outputs.append(np.exp(output)/sum(np.exp(output))) #Softmax
