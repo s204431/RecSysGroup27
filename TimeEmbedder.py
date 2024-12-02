@@ -9,5 +9,5 @@ class TimeEmbedder(nn.Module):
 
 
     def forward(self, news_vectors, times):
-        times = self.w*times + self.b
+        times = self.w*(times/100) + self.b
         return news_vectors + times.unsqueeze(1)
