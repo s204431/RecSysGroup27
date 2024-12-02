@@ -2,7 +2,7 @@ import torch
 import random
 import numpy as np
 from torch.utils.data import DataLoader
-from UserEncoder import UserEncoder
+from NRMS import NRMS
 from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
@@ -85,10 +85,10 @@ def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sa
     batch_gtpositions = torch.tensor(batch_gtpositions).to(DEVICE)
     return batch_history, batch_targets, batch_gtpositions
 
-def testOnWholeDataset(user_encoder, dataset_name, dataset_type, history_size, max_title_size, nlp):
+def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_title_size, nlp):
     log_every = 50
     batch_size = 200
-    user_encoder.eval()
+    model.eval()
     test_dataset = ArticlesDatasetTraining(dataset_name, dataset_type, nlp)
     dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
     outputs = []
@@ -97,7 +97,7 @@ def testOnWholeDataset(user_encoder, dataset_name, dataset_type, history_size, m
     for batch in dataloader:
         k_batch = findMaxInviewInBatch(batch)
         batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, history_size, max_title_size, test_dataset, nlp, negative_sampling=False)
-        batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+        batch_outputs = model(history=batch_history, targets=batch_targets)
         batch_targets = batch_gtpositions
         batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
         for i in range(0, len(batch)):
@@ -111,18 +111,15 @@ def testOnWholeDataset(user_encoder, dataset_name, dataset_type, history_size, m
     print("Final AUC score on whole dataset: ", auc_score)
     return auc_score
 
-def train(user_encoder, weight_decay, learning_rate, history_size, max_title_size, nlp):
+def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp):
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', nlp)
-    #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=list)
     validation_loader = DataLoader(val_dataset, batch_size=validation_batch_size, shuffle=True, collate_fn=list)
-    #user_encoder = UserEncoder(h=h, dropout=dropout).to(DEVICE)
-    #user_encoder.load_state_dict(torch.load('model.pth', map_location=DEVICE)) #Used to load the model from file
 
-    optimizer = torch.optim.Adam(user_encoder.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     criterion = nn.NLLLoss()
-    user_encoder.train()
+    model.train()
     n_batches_finished = 0
     auc_metric = AucScore()
     for i in range(0, num_epochs):
@@ -133,7 +130,7 @@ def train(user_encoder, weight_decay, learning_rate, history_size, max_title_siz
         for batch in train_loader:
 
             batch_history, batch_targets, batch_gtpositions = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
-            batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+            batch_outputs = model(history=batch_history, targets=batch_targets)
 
             loss = criterion(batch_outputs, batch_gtpositions)
             optimizer.zero_grad()
@@ -150,7 +147,7 @@ def train(user_encoder, weight_decay, learning_rate, history_size, max_title_siz
             losses.append(loss.cpu().detach().numpy())
             n_batches_finished += 1
             if n_batches_finished % validate_every == 0 or n_batches_finished == 1: #We also validate after the first batch to see amount of learning at the start
-                user_encoder.eval()
+                model.eval()
                 n_batches_finished_val = 0
                 val_outputs = []
                 val_gtpositions = []
@@ -164,7 +161,7 @@ def train(user_encoder, weight_decay, learning_rate, history_size, max_title_siz
                     k_batch = findMaxInviewInBatch(batch)
                     batch_history, batch_targets, batch_gtpositions = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
                     with torch.no_grad():
-                        batch_outputs = user_encoder(history=batch_history, targets=batch_targets)
+                        batch_outputs = model(history=batch_history, targets=batch_targets)
                         val_loss += criterion(batch_outputs, batch_gtpositions).cpu().numpy()
                     batch_outputs, batch_gtpositions = convertOutputAndgtPositions(batch_outputs, batch_gtpositions, batch)
                     for i in range(0, len(batch)):
@@ -186,14 +183,14 @@ def train(user_encoder, weight_decay, learning_rate, history_size, max_title_siz
                 losses = []
                 train_outputs = []
                 train_gt_positions = []
-                user_encoder.train()
+                model.train()
             if n_batches_finished >= max_batches:
                 break
         if n_batches_finished >= max_batches:
             break
     
     with torch.no_grad(): #Test on whole validation set
-        return testOnWholeDataset(user_encoder, "ebnerd_small", "validation", history_size, max_title_size, nlp)
+        return testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
 
 def tuneParameters(nlp): #Tries different values of parameters and prints results
     print("Tuning...")
@@ -208,8 +205,8 @@ def tuneParameters(nlp): #Tries different values of parameters and prints result
             for dout in dropouts:
                 for hs in history_sizes:
                     for mts in max_titles_sizes:
-                        user_encoder = UserEncoder(nlp, 6, dout)
-                        auc_score = train(user_encoder, wd, lr, hs, mts)
+                        model = NRMS(nlp, 6, dout)
+                        auc_score = train(model, wd, lr, hs, mts)
                         new_row = {"weight_decay":wd, "learning_rate":lr, "dropout":dout, "history_size":hs, "max_titles_size":mts, "AUC_Score":auc_score}
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                         df.to_excel("tuning2.xlsx")
