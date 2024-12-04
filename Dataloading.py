@@ -37,15 +37,16 @@ def encode_impression_time(time_string):
     january_first_2023 = datetime(2023, 1, 1)
     return (datetime.fromisoformat(str(time_string)) - january_first_2023).total_seconds() / (60*60*24)
 
-def remove_duplicates(data_frame):
+def remove_duplicates_until_n_left(data_frame, n):
     #df_behaviors = df_behaviors[~df_behaviors.duplicated(subset='article_ids_clicked', keep='first')]
-    seen_entries = set()
+    seen_entries = {}
 
-    def filter_func(value):
-        value = str(value)
-        if value in seen_entries:
+    def filter_func(v):
+        key = str(v)
+        value = seen_entries.get(key, 1)
+        if value > n:
             return False
-        seen_entries.add(value)
+        seen_entries[key] = value + 1
         return True
     
     return data_frame[data_frame['article_ids_clicked'].apply(filter_func)]
@@ -61,7 +62,7 @@ class ArticlesDatasetTraining(Dataset):
         df_history = df_history[['user_id','article_id_fixed','impression_time_fixed']]
         df_articles = df_articles[['article_id', 'title', 'subtitle']]
         df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked', 'impression_time']]
-        #df_behaviors = remove_duplicates(df_behaviors)
+        #df_behaviors = remove_duplicates_until_n_left(df_behaviors, 10)
         df_behaviors[['impression_time']] = df_behaviors[['impression_time']].map(encode_impression_time)
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
