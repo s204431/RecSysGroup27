@@ -63,9 +63,9 @@ def getData(user_id, inview, clicked, impression_time, dataset, history_size, k,
         targets = inview
     gt_position = random.randrange(0, len(targets)+1)
     targets.insert(gt_position, clicked)
-    sample_indices = sampleIndices(history, history_size)
-    history = [history[i] for i in sample_indices]
-    history_times = [history_times[i] for i in sample_indices]
+    sampled_indices = sampleIndices(history, history_size)
+    history = [history[i] for i in sampled_indices]
+    history_times = [history_times[i] for i in sampled_indices]
     time_difference = impression_time - history_times
     time_padding_list = [30.0] * (history_size - len(history_times))
     time_difference = time_difference.tolist() + time_padding_list
