@@ -20,6 +20,7 @@ class NRMS(nn.Module):
         self.h = h
         self.dropout = dropout
         self.d_model_out = 256
+        self.nlp = nlp
         self.news_encoder = NewsEncoder(nlp=nlp, d_model_out=self.d_model_out, h=self.h, dropout=self.dropout).to(DEVICE)
         self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0).to(DEVICE)
 
@@ -30,7 +31,9 @@ class NRMS(nn.Module):
 
         encoded_history = self.news_encoder(history.contiguous().view(-1, *history.shape[2:]))
         encoded_history = encoded_history.contiguous().view(batch_size, history_size, *encoded_history.shape[1:])
-        u = self.MHSA(encoded_history, encoded_history, encoded_history)
+        mask = 1 - (history == len(self.nlp.vocab.vectors)).all(dim=-1).float()
+        mask = torch.matmul(mask.unsqueeze(-1), mask.unsqueeze(1))
+        u = self.MHSA(encoded_history, encoded_history, encoded_history, mask=mask)
 
         r = self.news_encoder(targets.contiguous().view(-1, *targets.shape[2:]))
         r = r.contiguous().view(batch_size, targets_size, *r.shape[1:])

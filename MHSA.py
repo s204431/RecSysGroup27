@@ -37,9 +37,9 @@ class MultiHeadedAttention(nn.Module):
     def attention(self, query, key, value, mask=None, dropout=None):
         "Compute 'Scaled Dot Product Attention'"
         #d_k = torch.tensor(query.size(-1))
-        scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(self.d_k)
+        scores = torch.matmul(query, key.transpose(-2, -1)) / np.sqrt(self.d_k)
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, -math.inf)
+            scores = scores.masked_fill(mask == 0, -1000000)
         p_attn = nn.functional.softmax(scores, dim = -1)
         if dropout is not None:
             p_attn = dropout(p_attn)
@@ -71,5 +71,4 @@ class MultiHeadedAttention(nn.Module):
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
         #print("4: ", x.shape)
-        #return self.linears[-1](x)
         return self.attention2(x)

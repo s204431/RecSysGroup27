@@ -20,7 +20,7 @@ import pandas as pd
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 #Parameters
-dataset_name = 'ebnerd_large'
+dataset_name = 'ebnerd_small'
 k = 4
 batch_size = 64
 #h = 16
@@ -107,7 +107,7 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
     for batch in dataloader:
         k_batch = findMaxInviewInBatch(batch)
         batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, test_dataset, nlp, negative_sampling=False)
-        batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
+        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
         batch_targets = batch_gtpositions
         batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
         for i in range(0, len(batch)):
@@ -148,7 +148,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
         for batch in train_loader:
 
             batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
-            batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
+            batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
 
             loss = criterion(batch_outputs, batch_gtpositions)
             optimizer.zero_grad()
@@ -179,7 +179,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                     k_batch = findMaxInviewInBatch(batch)
                     batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
                     with torch.no_grad():
-                        batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
+                        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
                         val_loss += criterion(batch_outputs, batch_gtpositions).cpu().numpy()
                     batch_outputs, batch_gtpositions = convertOutputAndgtPositions(batch_outputs, batch_gtpositions, batch)
                     for i in range(0, len(batch)):
@@ -203,7 +203,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                 val_losses_overall.append((val_loss/len(val_outputs)).item())
                 if val_aucscore > best_val_auc:
                     best_val_auc = val_aucscore
-                    torch.save(model.state_dict(), 'model_best.pth')
+                    #torch.save(model.state_dict(), 'model_best.pth')
                 accuracies = []
                 losses = []
                 train_outputs = []
@@ -217,6 +217,11 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
     with torch.no_grad(): #Test on whole validation set
         final_auc = testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
     
+    model.load_state_dict(torch.load('model_best.pth', map_location=DEVICE))
+
+    with torch.no_grad(): #Test on whole validation set
+        best_auc = testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
+    
     file = open("results.txt", "w")
     file.write("Weight Decay " + str(weight_decay) + ", Learning rate " + str(learning_rate) + ", History size " + str(history_size) + ", Max title size " + str(max_title_size))
     file.write("\nTrain aucs ")
@@ -229,6 +234,8 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
     file.write(str(val_losses_overall))
     file.write("\nFinal AUC score on whole small validation set: ")
     file.write(str(final_auc))
+    file.write("\nAUC score for best version: ")
+    file.write(str(best_auc))
     file.close()
     return final_auc
 
