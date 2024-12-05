@@ -58,10 +58,10 @@ def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
         #print(history, targets)
 
         #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
-        batch_history.append(pad_token_list(history, max_title_size, vocab_size, history_size))
+        batch_history.append(pad_token_list(history, max_title_size, vocab_size+1, history_size))
 
         #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
-        batch_targets.append(pad_token_list(targets, max_title_size, vocab_size, k+1))
+        batch_targets.append(pad_token_list(targets, max_title_size, vocab_size+1, k+1))
 
         batch_time_differences.append(time_differences)
 

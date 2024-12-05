@@ -20,7 +20,7 @@ import pandas as pd
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 #Parameters
-dataset_name = 'ebnerd_small'
+dataset_name = 'ebnerd_large'
 k = 4
 batch_size = 64
 #h = 16
@@ -82,10 +82,10 @@ def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sa
         if history != None:
 
             #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
-            batch_history.append(pad_token_list(history, max_title_size, vocab_size, history_size))
+            batch_history.append(pad_token_list(history, max_title_size, vocab_size+1, history_size))
 
             #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
-            batch_targets.append(pad_token_list(targets, max_title_size, vocab_size, k+1))
+            batch_targets.append(pad_token_list(targets, max_title_size, vocab_size+1, k+1))
 
             batch_gtpositions.append(int(gt_position))
             batch_time_differences.append(time_differences)
@@ -121,7 +121,7 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
     print("Final AUC score on whole dataset: ", auc_score)
     return auc_score
 
-def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp):
+def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp, save_model=False):
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', nlp)
     #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
@@ -201,9 +201,9 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                 train_losses_overall.append((sum(losses)/len(losses)).item())
                 val_aucs_overall.append(val_aucscore)
                 val_losses_overall.append((val_loss/len(val_outputs)).item())
-                if val_aucscore > best_val_auc:
+                if val_aucscore > best_val_auc and save_model:
                     best_val_auc = val_aucscore
-                    #torch.save(model.state_dict(), 'model_best.pth')
+                    torch.save(model.state_dict(), 'model_best.pth')
                 accuracies = []
                 losses = []
                 train_outputs = []
@@ -213,6 +213,9 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                 break
         if n_batches_finished >= max_batches:
             break
+    
+    if save_model:
+        torch.save(model.state_dict(), 'model.pth')
     
     with torch.no_grad(): #Test on whole validation set
         final_auc = testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)

@@ -17,7 +17,7 @@ class NewsEncoder(nn.Module):
         self.MHSA = MultiHeadedAttention(h=self.h, d_model=300, d_model_out=d_model_out, dropout=0.0).to(DEVICE)
     
     def forward(self, token_ids):
-        mask = (token_ids != len(self.nlp.vocab.vectors)).float()
+        mask = (token_ids != len(self.nlp.vocab.vectors)+1).float()
         mask = torch.matmul(mask.unsqueeze(-1), mask.unsqueeze(1))
         vectors = self.newsEmbedder(token_ids)
         return self.MHSA(vectors, vectors, vectors, mask=mask)

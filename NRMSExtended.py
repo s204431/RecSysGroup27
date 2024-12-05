@@ -32,7 +32,7 @@ class NRMSExtended(nn.Module):
         encoded_history = self.news_encoder(history.contiguous().view(-1, *history.shape[2:]))
         encoded_history = self.timeEmbedder(encoded_history, history_times.contiguous().view(-1, *history_times.shape[2:]))
         encoded_history = encoded_history.contiguous().view(batch_size, history_size, *encoded_history.shape[1:])
-        mask = 1 - (history == len(self.nlp.vocab.vectors)).all(dim=-1).float()
+        mask = 1 - (history == len(self.nlp.vocab.vectors)+1).all(dim=-1).float()
         mask = torch.matmul(mask.unsqueeze(-1), mask.unsqueeze(1))
         u = self.MHSA(encoded_history, encoded_history, encoded_history, mask=mask)
 
