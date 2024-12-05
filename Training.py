@@ -3,6 +3,7 @@ import random
 import numpy as np
 from torch.utils.data import DataLoader
 from NRMS import NRMS
+from NRMSExtended import NRMSExtended
 from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
@@ -19,7 +20,7 @@ import pandas as pd
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 #Parameters
-dataset_name = 'ebnerd_small'
+dataset_name = 'ebnerd_large'
 k = 4
 batch_size = 64
 #h = 16
@@ -33,7 +34,7 @@ validate_every = 200 #How many train batches between validations
 validation_batch_size = 200 #The batch size for validation
 n_validation_batches = 50 #How many batches to run for each validation
 
-max_batches = 5000 #Use this if you want to end the training early
+max_batches = 50000 #Use this if you want to end the training early
 
 #history_size = 20
 #max_title_size = 30
@@ -66,9 +67,8 @@ def getData(user_id, inview, clicked, impression_time, dataset, history_size, k,
     history = [history[i] for i in sample_indices]
     history_times = [history_times[i] for i in sample_indices]
     time_difference = impression_time - history_times
-    time_padding_list = [99999.0] * (history_size - len(history_times))
+    time_padding_list = [30.0] * (history_size - len(history_times))
     time_difference = time_difference.tolist() + time_padding_list
-    print(time_difference)
     return history, targets, gt_position, time_difference
 
 def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sampling=True):
@@ -107,7 +107,7 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
     for batch in dataloader:
         k_batch = findMaxInviewInBatch(batch)
         batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, test_dataset, nlp, negative_sampling=False)
-        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
+        batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
         batch_targets = batch_gtpositions
         batch_outputs, batch_targets = convertOutputAndgtPositions(batch_outputs, batch_targets, batch)
         for i in range(0, len(batch)):
@@ -135,6 +135,11 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
     model.train()
     n_batches_finished = 0
     auc_metric = AucScore()
+    train_aucs_overall = []
+    train_losses_overall = []
+    val_aucs_overall = []
+    val_losses_overall = []
+    best_val_auc = 0.0
     for i in range(0, num_epochs):
         accuracies = []
         losses = []
@@ -143,7 +148,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
         for batch in train_loader:
 
             batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k, history_size, max_title_size, train_dataset, nlp)
-            batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
+            batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
 
             loss = criterion(batch_outputs, batch_gtpositions)
             optimizer.zero_grad()
@@ -157,7 +162,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                 train_gt_positions.append(target)
             acc = accuracy(batch_outputs, batch_gtpositions)
             accuracies.append(acc)
-            losses.append(loss.cpu().detach().numpy())
+            losses.append(loss.cpu().detach().numpy()/batch_size)
             n_batches_finished += 1
             if n_batches_finished % validate_every == 0 or n_batches_finished == 1: #We also validate after the first batch to see amount of learning at the start
                 model.eval()
@@ -174,7 +179,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                     k_batch = findMaxInviewInBatch(batch)
                     batch_history, batch_targets, batch_gtpositions, batch_time_differences = make_batch(batch, k_batch, history_size, max_title_size, val_dataset, nlp, negative_sampling=False)
                     with torch.no_grad():
-                        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
+                        batch_outputs = model(history=batch_history, targets=batch_targets)#, history_times=batch_time_differences)
                         val_loss += criterion(batch_outputs, batch_gtpositions).cpu().numpy()
                     batch_outputs, batch_gtpositions = convertOutputAndgtPositions(batch_outputs, batch_gtpositions, batch)
                     for i in range(0, len(batch)):
@@ -183,7 +188,7 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                     n_batches_finished_val += 1
                     if (n_batches_finished_val >= n_validation_batches):
                         break
-
+                
                 val_aucscore = auc_metric.calculate(val_gtpositions, val_outputs)
                 train_aucscore = auc_metric.calculate(train_gt_positions, train_outputs)
                 print("Validation auc: ", val_aucscore)
@@ -192,6 +197,13 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
                 print("Average train loss: ", sum(losses)/len(losses))
                 print("Average train accuracy: ", sum(accuracies)/len(accuracies))
                 print()
+                train_aucs_overall.append(train_aucscore)
+                train_losses_overall.append((sum(losses)/len(losses)).item())
+                val_aucs_overall.append(val_aucscore)
+                val_losses_overall.append((val_loss/len(val_outputs)).item())
+                if val_aucscore > best_val_auc:
+                    best_val_auc = val_aucscore
+                    torch.save(model.state_dict(), 'model_best.pth')
                 accuracies = []
                 losses = []
                 train_outputs = []
@@ -203,7 +215,22 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp)
             break
     
     with torch.no_grad(): #Test on whole validation set
-        return testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
+        final_auc = testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
+    
+    file = open("results.txt", "w")
+    file.write("Weight Decay " + str(weight_decay) + ", Learning rate " + str(learning_rate) + ", History size " + str(history_size) + ", Max title size " + str(max_title_size))
+    file.write("\nTrain aucs ")
+    file.write(str(train_aucs_overall))
+    file.write("\nTrain losses ")
+    file.write(str(train_losses_overall))
+    file.write("\nValidation aucs ")
+    file.write(str(val_aucs_overall))
+    file.write("\nValidation losses ")
+    file.write(str(val_losses_overall))
+    file.write("\nFinal AUC score on whole small validation set: ")
+    file.write(str(final_auc))
+    file.close()
+    return final_auc
 
 def tuneParameters(nlp): #Tries different values of parameters and prints results
     print("Tuning...")
@@ -218,7 +245,7 @@ def tuneParameters(nlp): #Tries different values of parameters and prints result
             for dout in dropouts:
                 for hs in history_sizes:
                     for mts in max_titles_sizes:
-                        model = NRMS(nlp, 6, dout)
+                        model = NRMSExtended(nlp, 16, dout)
                         auc_score = train(model, wd, lr, hs, mts)
                         new_row = {"weight_decay":wd, "learning_rate":lr, "dropout":dout, "history_size":hs, "max_titles_size":mts, "AUC_Score":auc_score}
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
