@@ -49,7 +49,7 @@ def getData(user_id, inview, inview_times, impression_time, dataset, history_siz
     time_difference_history = time_difference_history.tolist() + time_padding_list_history
 
     targets_time = inview_times
-    time_padding_list_inview = [99999.0] * (k - len(inview_times))
+    time_padding_list_inview = [99999.0] * (k+1 - len(inview_times))
     targets_time = targets_time.tolist() + time_padding_list_inview
 
     return history, inview, time_difference_history, targets_time
@@ -61,7 +61,7 @@ def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
     batch_history_times = []
     batch_inview_times = []
     for _, user_id, inview, inview_times, impression_time in batch:
-        history, targets, history_time, targets_time = getData(user_id, inview, inview_times, impression_time, dataset, history_size)
+        history, targets, history_time, targets_time = getData(user_id, inview, inview_times, impression_time, dataset, history_size, k)
         #print(history, targets)
 
         #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
