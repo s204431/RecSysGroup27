@@ -30,12 +30,16 @@ def replace_ids_with_titles(article_ids, article_dict, subtitle_dict):
     return [f"{article_dict.get(article_id, '')} {subtitle_dict.get(article_id, '')}" for article_id in article_ids]
 
 def encode_history_times(time_strings):
-    january_first_2023 = datetime(2023, 1, 1)
-    return [(datetime.fromisoformat(str(time_string)) - january_first_2023).total_seconds() / (60*60*24) for time_string in time_strings]
+    january_first_1970 = datetime(1970, 1, 1)
+    return [(datetime.fromisoformat(str(time_string)) - january_first_1970).total_seconds() / (60*60) for time_string in time_strings]
 
 def encode_impression_time(time_string):
-    january_first_2023 = datetime(2023, 1, 1)
-    return (datetime.fromisoformat(str(time_string)) - january_first_2023).total_seconds() / (60*60*24)
+    january_first_1970 = datetime(1970, 1, 1)
+    return (datetime.fromisoformat(str(time_string)) - january_first_1970).total_seconds() / (60*60)
+
+def encode_article_times(article_ids, dict):
+    january_first_1970 = datetime(1970, 1, 1)
+    return [(datetime.fromisoformat(str(dict[id])) - january_first_1970).total_seconds() / (60*60) for id in article_ids]
 
 def remove_duplicates_until_n_left(data_frame, n):
     #df_behaviors = df_behaviors[~df_behaviors.duplicated(subset='article_ids_clicked', keep='first')]
@@ -60,13 +64,14 @@ class ArticlesDatasetTraining(Dataset):
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, type, "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed','impression_time_fixed']]
-        df_articles = df_articles[['article_id', 'title', 'subtitle']]
+        df_articles = df_articles[['article_id', 'title', 'subtitle', 'published_time']]
         df_behaviors = df_behaviors[['user_id', 'article_ids_inview', 'article_ids_clicked', 'impression_time']]
         #df_behaviors = remove_duplicates_until_n_left(df_behaviors, 10)
         df_behaviors[['impression_time']] = df_behaviors[['impression_time']].map(encode_impression_time)
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
         self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
+        self.article_time_dict = pd.Series(df_articles['published_time'].values,index=df_articles['article_id']).to_dict()
         #df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         #df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
@@ -76,10 +81,12 @@ class ArticlesDatasetTraining(Dataset):
         else:
             mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
-        df_history[['impression_time_fixed']] = df_history[['impression_time_fixed']].map(encode_history_times)
+        #df_history[['impression_time_fixed']] = df_history[['impression_time_fixed']].map(encode_history_times)
+        df_history[['published_time_fixed']] = df_history[['article_id_fixed']].map(lambda ids: encode_article_times(ids, self.article_time_dict))
         df_behaviors[['article_titles_inview', 'article_titles_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(mapping)
+        df_behaviors[['article_times_inview', 'article_times_clicked']] = df_behaviors[['article_ids_inview', 'article_ids_clicked']].map(lambda ids: encode_article_times(ids, self.article_time_dict))
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
-        self.time_dict = pd.Series(df_history['impression_time_fixed'].values,index=df_history['user_id']).to_dict()
+        self.time_dict = pd.Series(df_history['published_time_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
 
@@ -94,7 +101,7 @@ class ArticlesDatasetTraining(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['user_id'], row['article_titles_inview'], row['article_titles_clicked'], row['impression_time']
+        return row['user_id'], row['article_titles_inview'], row['article_times_inview'], row['impression_time'], row['article_titles_clicked'], row['article_times_clicked']
 
 class ArticlesDatasetTest(Dataset):
     def __init__(self, DATASET, nlp):
@@ -105,12 +112,13 @@ class ArticlesDatasetTest(Dataset):
         df_behaviors = pd.read_parquet(PATH.joinpath(DATASET, "test", "behaviors.parquet"))
         df_articles  = pd.read_parquet(PATH.joinpath(DATASET, "articles.parquet"))
         df_history = df_history[['user_id','article_id_fixed','impression_time_fixed']]
-        df_articles = df_articles[['article_id', 'title', 'subtitle']]
+        df_articles = df_articles[['article_id', 'title', 'subtitle', 'published_time']]
         df_behaviors = df_behaviors[['impression_id', 'user_id', 'article_ids_inview','impression_time']]
         df_behaviors[['impression_time']] = df_behaviors[['impression_time']].map(encode_impression_time)
         self.df_data = df_behaviors
         self.article_dict = pd.Series(df_articles['title'].values,index=df_articles['article_id']).to_dict()
         self.subtitle_dict = pd.Series(df_articles['subtitle'].values,index=df_articles['article_id']).to_dict()
+        self.article_time_dict = pd.Series(df_articles['published_time'].values,index=df_articles['article_id']).to_dict()
         #df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         #df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(replace_ids_with_titles, article_dict=self.article_dict, subtitle_dict=self.subtitle_dict)
         self.combined_dict = {article_id: f"{self.article_dict.get(article_id, '')} {self.subtitle_dict.get(article_id, '')}" for article_id in set(self.article_dict).union(self.subtitle_dict)}
@@ -120,10 +128,12 @@ class ArticlesDatasetTest(Dataset):
         else:
             mapping = lambda article_ids: [f"{self.combined_dict.get(article_id, '')}" for article_id in article_ids]
         df_history[['article_titles_fixed']] = df_history[['article_id_fixed']].map(mapping)
-        df_history[['impression_time_fixed']] = df_history[['impression_time_fixed']].map(encode_history_times)
+        #df_history[['impression_time_fixed']] = df_history[['impression_time_fixed']].map(encode_history_times)
+        df_history[['published_time_fixed']] = df_history[['article_id_fixed']].map(lambda ids: encode_article_times(ids, self.article_time_dict))
         df_behaviors[['article_titles_inview']] = df_behaviors[['article_ids_inview']].map(mapping)
+        df_behaviors[['article_times_inview']] = df_behaviors[['article_ids_inview']].map(lambda ids: encode_article_times(ids, self.article_time_dict))
         self.history_dict = pd.Series(df_history['article_titles_fixed'].values,index=df_history['user_id']).to_dict()
-        self.time_dict = pd.Series(df_history['impression_time_fixed'].values,index=df_history['user_id']).to_dict()
+        self.time_dict = pd.Series(df_history['published_time_fixed'].values,index=df_history['user_id']).to_dict()
         print("Time to load data: ", time.time() - start)
 
 
@@ -138,7 +148,7 @@ class ArticlesDatasetTest(Dataset):
         Fetch user history and target article for a given index.
         """
         row = self.df_data.iloc[idx]
-        return row['impression_id'], row['user_id'], row['article_titles_inview'], row['impression_time']
+        return row['impression_id'], row['user_id'], row['article_titles_inview'], row['article_times_inview'], row['impression_time']
 
 '''
 dataset = ArticlesDatasetTraining('ebnerd_small', 'train')

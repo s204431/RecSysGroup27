@@ -37,24 +37,31 @@ def convertLines():
     with open("predictions_2.txt", "wb") as file:
         file.write(content)
 
-def getData(user_id, inview, impression_time, dataset, history_size):
+def getData(user_id, inview, inview_times, impression_time, dataset, history_size, k):
     history = dataset.history_dict[user_id]
     history_times = dataset.time_dict[user_id]
+    inview_times = impression_time - inview_times
     sampled_indices = sampleIndices(history, history_size)
     history = [history[i] for i in sampled_indices]
     history_times = [history_times[i] for i in sampled_indices]
-    time_differences = impression_time - history_times
-    time_padding_list = [30.0] * (history_size - len(history_times))
-    time_differences = time_differences.tolist() + time_padding_list
-    return history, inview, time_differences
+    time_difference_history = impression_time - history_times
+    time_padding_list_history = [99999.0] * (history_size - len(history_times))
+    time_difference_history = time_difference_history.tolist() + time_padding_list_history
+
+    targets_time = inview_times
+    time_padding_list_inview = [99999.0] * (k - len(inview_times))
+    targets_time = targets_time.tolist() + time_padding_list_inview
+
+    return history, inview, time_difference_history, targets_time
 
 def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
     vocab_size = nlp.vocab.vectors.shape[0]
     batch_history = []
     batch_targets = []
-    batch_time_differences = []
-    for _, user_id, inview, impression_time in batch:
-        history, targets, time_differences = getData(user_id, inview, impression_time, dataset, history_size)
+    batch_history_times = []
+    batch_inview_times = []
+    for _, user_id, inview, inview_times, impression_time in batch:
+        history, targets, history_time, targets_time = getData(user_id, inview, inview_times, impression_time, dataset, history_size)
         #print(history, targets)
 
         #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
@@ -63,12 +70,14 @@ def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
         #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
         batch_targets.append(pad_token_list(targets, max_title_size, vocab_size+1, k+1))
 
-        batch_time_differences.append(time_differences)
+        batch_history_times.append(history_time)
+        batch_inview_times.append(targets_time)
 
     batch_history = torch.tensor(batch_history).to(DEVICE)
     batch_targets = torch.tensor(batch_targets).to(DEVICE)
-    batch_time_differences = torch.tensor(batch_time_differences).to(DEVICE)
-    return batch_history, batch_targets, batch_time_differences
+    batch_history_times = torch.tensor(batch_history_times).to(DEVICE)
+    batch_inview_times = torch.tensor(batch_inview_times).to(DEVICE)
+    return batch_history, batch_targets, batch_history_times, batch_inview_times
 
 def runOnTestSet(model, history_size, max_title_size, nlp):
     log_every = 50
@@ -83,10 +92,10 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
     for batch in validation_loader:
         k_batch = findMaxInviewInBatchTesting(batch)
         #start = time.time()
-        batch_history, batch_targets, batch_time_differences = make_batch(batch, test_dataset, nlp, k_batch, history_size, max_title_size)
+        batch_history, batch_targets, batch_history_times, batch_inview_times = make_batch(batch, test_dataset, nlp, k_batch, history_size, max_title_size)
         #print("Time to make batch: ", time.time() - start)
         #start = time.time()
-        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_time_differences)
+        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_history_times.float(), inview_times=batch_inview_times.float())
         #batch_outputs = torch.tensor([[random.random() for _ in range(k_batch)] for _ in batch_history])
         #print("Time for batch: ", time.time() - start)
         #start = time.time()
@@ -94,7 +103,7 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
         batch_outputs = convertOutput(batch_outputs, batch)
         
         for i in range(0, len(batch)):
-            impression_id, _, inview, impression_time = batch[i]
+            impression_id, _, _, _, _ = batch[i]
             output = batch_outputs[i]
             ranking = ss.rankdata(-output, method="ordinal").astype(int).tolist()
             outputs.append([[impression_id], ranking])

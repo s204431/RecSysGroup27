@@ -21,10 +21,10 @@ class NRMSExtended(nn.Module):
         self.d_model_out = 256
         self.nlp = nlp
         self.news_encoder = NewsEncoder(nlp=nlp, d_model_out=self.d_model_out, h=self.h, dropout=self.dropout).to(DEVICE)
-        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out*2, d_model_out=self.d_model_out, dropout=0.0).to(DEVICE)
+        self.MHSA = MultiHeadedAttention(h=self.h, d_model=self.d_model_out, d_model_out=self.d_model_out, dropout=0.0).to(DEVICE)
         self.timeEmbedder = TimeEmbedder(d_model_out=self.d_model_out).to(DEVICE)
 
-    def forward(self, history, targets, history_times):
+    def forward(self, history, targets, history_times, inview_times):
         batch_size = history.shape[0]
         history_size = history.shape[1]
         targets_size = targets.shape[1]
@@ -37,6 +37,7 @@ class NRMSExtended(nn.Module):
         u = self.MHSA(encoded_history, encoded_history, encoded_history, mask=mask)
 
         r = self.news_encoder(targets.contiguous().view(-1, *targets.shape[2:]))
+        r = self.timeEmbedder(r, inview_times.contiguous().view(-1, *inview_times.shape[2:]))
         r = r.contiguous().view(batch_size, targets_size, *r.shape[1:])
         dot_product = torch.bmm(r, u.unsqueeze(2)).squeeze(2)
         return nn.LogSoftmax(dim=1)(dot_product)

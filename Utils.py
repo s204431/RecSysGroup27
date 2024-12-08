@@ -49,14 +49,14 @@ def pad_token_list_only_tokens(token_list, token_length, padding_value):
 
 def findMaxInviewInBatch(batch):
     maximum = 0
-    for _, inview, _, _ in batch:
+    for _, inview, _, _, _, _ in batch:
         if len(inview) > maximum:
             maximum = len(inview)
     return maximum
 
 def findMaxInviewInBatchTesting(batch):
     maximum = 0
-    for _, _, inview, _ in batch:
+    for _, _, inview, _, _ in batch:
         if len(inview) > maximum:
             maximum = len(inview)
     return maximum
@@ -73,7 +73,7 @@ def convertOutput(batch_output, batch):
     outputs = []
     for i in range(0, len(batch_output)):
         output = batch_output[i]
-        _, _, inview, _ = batch[i]
+        _, _, inview, _, _ = batch[i]
         output = output[:len(inview)]
         outputs.append(output)
         #outputs.append(np.exp(output)/sum(np.exp(output))) #Softmax
@@ -84,7 +84,7 @@ def convertOutputAndgtPositions(batch_output, batch_gt_positions, batch):
     targets = []
     for i in range(0, batch_output.shape[0]):
         output = batch_output[i]
-        _, inview, _, _ = batch[i]
+        _, inview, _, _, _, _ = batch[i]
         gt_position = batch_gt_positions[i]
         output = output[:len(inview)].cpu().numpy()
         outputs.append(np.exp(output)/sum(np.exp(output))) #Softmax
