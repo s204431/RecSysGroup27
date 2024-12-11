@@ -7,39 +7,13 @@ from NRMSExtended import NRMSExtended
 from torch import nn
 from sklearn.metrics import roc_auc_score
 from Dataloading import ArticlesDatasetTraining
-#from Testing import runOnTestSet
 import spacy
 from torch.nn.utils.rnn import pad_sequence
 from GitMetrics import AucScore, AccuracyScore
 from Utils import sampleIndices, sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatch, convertOutputAndgtPositions, convertgtPositionsToVec
-import time
 import pandas as pd
 
-#nlp = spacy.load("da_core_news_md")  # Load danish model
-
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
-#Parameters
-dataset_name = 'ebnerd_large'
-k = 4
-batch_size = 64
-#h = 16
-#dropout = 0.2
-#weight_decay = 0.0
-
-#learning_rate = 1e-3
-num_epochs = 100 #Not really used
-
-validate_every = 200 #How many train batches between validations
-validation_batch_size = 200 #The batch size for validation
-n_validation_batches = 50 #How many batches to run for each validation
-
-max_batches = 50000 #Use this if you want to end the training early
-
-#history_size = 20
-#max_title_size = 30
-
-
 
 def accuracy(outputs, targets):
     nCorrect = 0
@@ -90,11 +64,7 @@ def make_batch(batch, k, history_size, max_title_size, dataset, nlp, negative_sa
     for user_id, inview, inview_times, impression_time, clicked, clicked_times in batch:
         history, targets, gt_position, history_time, targets_time = getData(user_id, inview, inview_times, impression_time, clicked, clicked_times, dataset, history_size, k, negative_sampling)
         if history != None:
-
-            #history = replace_titles_with_tokens(history, nlp, vocab_size, history_size)
             batch_history.append(pad_token_list(history, max_title_size, vocab_size+1, history_size))
-
-            #targets = replace_titles_with_tokens(targets, nlp, vocab_size, k+1)
             batch_targets.append(pad_token_list(targets, max_title_size, vocab_size+1, k+1))
 
             batch_gtpositions.append(int(gt_position))
@@ -133,7 +103,24 @@ def testOnWholeDataset(model, dataset_name, dataset_type, history_size, max_titl
     print("Final AUC score on whole dataset: ", auc_score)
     return auc_score
 
-def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp, save_model=False):
+def train(
+        model, 
+        dataset_name='ebnerd_large', 
+        k=4, 
+        batch_size=64, 
+        weight_decay=0.0, 
+        learning_rate=1e-3, 
+        history_size=30, 
+        max_title_size=20, 
+        nlp=spacy.load("da_core_news_lg"), 
+        save_model=False,
+        num_epochs=100,
+        validate_every=200,
+        validation_batch_size=200,
+        n_validation_batches=50,
+        max_batches=50000
+        ):
+    
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
     val_dataset = ArticlesDatasetTraining(dataset_name, 'validation', nlp)
     #val_index_subset = random.sample(range(0, len(val_dataset)), validation_size)
@@ -254,7 +241,19 @@ def train(model, weight_decay, learning_rate, history_size, max_title_size, nlp,
     file.close()
     return final_auc
 
-def tuneParameters(nlp): #Tries different values of parameters and prints results
+def tuneParameters(
+        nlp, 
+        dataset_name='ebnerd_large', 
+        k=4,
+        batch_size=64,
+        num_epochs=100,
+        validate_every=200,
+        validation_batch_size=200,
+        n_validation_batches=50,
+        max_batches=50000
+        ):
+    
+    """Tries different values of parameters and prints results"""
     print("Tuning...")
     weight_decays = [0.001, 0.00001]
     learning_rates = [1e-3]
@@ -268,7 +267,7 @@ def tuneParameters(nlp): #Tries different values of parameters and prints result
                 for hs in history_sizes:
                     for mts in max_titles_sizes:
                         model = NRMSExtended(nlp, 16, dout)
-                        auc_score = train(model, wd, lr, hs, mts)
+                        auc_score = train(model, dataset_name, k, batch_size, wd, lr, hs, mts, nlp, False, num_epochs, validate_every, validation_batch_size, n_validation_batches, max_batches)
                         new_row = {"weight_decay":wd, "learning_rate":lr, "dropout":dout, "history_size":hs, "max_titles_size":mts, "AUC_Score":auc_score}
                         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                         df.to_excel("tuning2.xlsx")

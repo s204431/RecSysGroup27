@@ -1,13 +1,8 @@
-#pip install ipywidgets rich seaborn torch tokenizers sentencepiece sacremoses --quiet
-
 import torch
 from torch import nn
-import seaborn as sns
 from MHSA import MultiHeadedAttention
 from NewsEncoder import NewsEncoder
 from TimeEmbedder import TimeEmbedder
-
-sns.set()
 
 # define the device to use
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")

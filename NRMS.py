@@ -1,13 +1,7 @@
-#pip install ipywidgets rich seaborn torch tokenizers sentencepiece sacremoses --quiet
-
 import torch
 from torch import nn
-import rich
-import seaborn as sns
 from MHSA import MultiHeadedAttention
 from NewsEncoder import NewsEncoder
-
-sns.set()
 
 # define the device to use
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -39,27 +33,3 @@ class NRMS(nn.Module):
         r = r.contiguous().view(batch_size, targets_size, *r.shape[1:])
         dot_product = torch.bmm(r, u.unsqueeze(2)).squeeze(2)
         return nn.LogSoftmax(dim=1)(dot_product)
-
-
-#history = ["This a test", "This is the click history"]
-#target = ["I hope this works!", "with multiple targets"]
-#user_encoder = UserEncoder(h=16, dropout=0.2)
-#output = user_encoder(history=history, targets=target)
-
-#rich.print(output.shape)
-#rich.print(output)
-
-#torch.manual_seed(42)
-#history_input = torch.tensor([[[0, 1, 2], [3, 4, 5]], [[6, 7, 8], [9, 10, 11]]])
-#targets_input = torch.tensor([[[0, 1, 2], [3, 4, 5], [20000, 20000, 20000]], [[6, 7, 8], [9, 10, 11], [20000, 20000, 20000]]])
-#user_encoder = UserEncoder(16, 0.2)
-#output = user_encoder(history_input, targets_input)
-#print(output)
-#u = torch.tensor([[0, 1, 2], [3, 4, 5]])
-#r = torch.tensor([[6, 7, 8], [9, 10, 11]])
-#print(torch.sum(u * r, dim=1))
-
-
-#news_encoder = NewsEncoder(d_model_out=16, h=16, dropout=0.2)
-#input = torch.tensor([[0, 1, 2, 20000], [3, 4, 5, 20000]])
-#print(news_encoder(input))

@@ -1,20 +1,6 @@
-#pip install ipywidgets rich seaborn torch tokenizers sentencepiece sacremoses --quiet
-
 import torch
 from torch import nn
-import math
-from functools import partial
-from pathlib import Path
-from tqdm import tqdm
-import rich
-from typing import List, Tuple, Optional, Dict, Any
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-import tokenizers
-import zipfile
-from huggingface_hub import hf_hub_download
-from NewsEmbedder import NewsEmbedder
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -33,10 +19,8 @@ class MultiHeadedAttention(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.q = nn.Parameter(torch.randn(size=(d_model_out,)))
 
-    """MULTI-HEADED SELF_ATTENTION"""
     def attention(self, query, key, value, mask=None, dropout=None):
-        "Compute 'Scaled Dot Product Attention'"
-        #d_k = torch.tensor(query.size(-1))
+        """Compute 'Scaled Dot Product Attention'"""
         scores = torch.matmul(query, key.transpose(-2, -1)) / np.sqrt(self.d_k)
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1000000)
@@ -46,29 +30,24 @@ class MultiHeadedAttention(nn.Module):
         return torch.matmul(p_attn, value), p_attn
 
     def attention2(self, h_vectors):
+        """Compute r"""
         a = torch.matmul(torch.tanh(self.linears[-1](h_vectors)), self.q)
-        #print(a.shape)
         alpha = torch.softmax(a, dim=-1)
-        #print("Dimensions before einsum: ", alpha.shape, h_vectors.shape)
         return torch.einsum("bk,bkh->bh", alpha, h_vectors)  #Returns r
     
     def forward(self, query, key, value, mask=None):
+        """Forward pass for the attention layer"""
         nbatches = query.size(0)
-        #print("Batches: ", nbatches)
         if mask is not None:
-            # Same mask applied to all h heads.
+            # Ensure that the same mask is applied to all heads
             mask = mask.unsqueeze(1)
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
-        #print("1: ", query.shape, key.shape, value.shape)
         query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))]
-        #print("2: ", query.shape, key.shape, value.shape)
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = self.attention(query, key, value, mask=mask, dropout=self.dropout)
-        #print("3: ", x.shape)
 
-        # 3) "Concat" using a view and apply a final linear.
+        # 3) "Concat" using a view and compute r.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
-        #print("4: ", x.shape)
         return self.attention2(x)

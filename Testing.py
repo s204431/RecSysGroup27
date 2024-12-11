@@ -1,10 +1,7 @@
 from Dataloading import ArticlesDatasetTest
-import random
 from Utils import sampleIndices, sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatchTesting, convertOutput
 import torch
 from torch.utils.data import DataLoader
-import time
-import numpy as np
 from NRMS import NRMS
 import scipy.stats as ss
 
@@ -91,14 +88,8 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
     
     for batch in validation_loader:
         k_batch = findMaxInviewInBatchTesting(batch)
-        #start = time.time()
         batch_history, batch_targets, batch_history_times, batch_inview_times = make_batch(batch, test_dataset, nlp, k_batch, history_size, max_title_size)
-        #print("Time to make batch: ", time.time() - start)
-        #start = time.time()
         batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_history_times.float(), inview_times=batch_inview_times.float())
-        #batch_outputs = torch.tensor([[random.random() for _ in range(k_batch)] for _ in batch_history])
-        #print("Time for batch: ", time.time() - start)
-        #start = time.time()
         batch_outputs = batch_outputs.cpu().numpy()
         batch_outputs = convertOutput(batch_outputs, batch)
         
@@ -109,10 +100,7 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
             outputs.append([[impression_id], ranking])
         iteration += 1
 
-        #print("Time to convert output: ", time.time() - start)
-
         if iteration % log_every == 0:
                 print("Finished: ", len(outputs))
-                #print("Test iteration", iteration)
-                #break
+                
     saveToFile(outputs)
