@@ -1,11 +1,7 @@
-#!pip install torch spacy pandas numpy tqdm scikit-learn scipy
-#!python -m spacy download da_core_news_lg
-
-
 import torch
+import spacy
 from NRMS import NRMS
 from NRMSExtended import NRMSExtended
-import spacy
 from Training import train, tuneParameters, testOnWholeDataset
 from Testing import runOnTestSet
 
