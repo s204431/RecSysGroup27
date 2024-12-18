@@ -1,54 +1,17 @@
-## Setup :wrench:
-login to your DTU account 
-```bash
-ssh <student number>@student.hpc.dtu.dk
-```
+# How to use
+We recommend using the notebook FinalNotebook.ipynb \
+The packages required are shown and installed in the notebook.
+It is necessary to download one or more of the datasets from https://recsys.eb.dk/ as explained below.
 
-Create a ssh key
-```bash
-ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
-```
+# Setup for the dataset
 
-Copy the pubic key and insert it into GitHub
-```bash
-cat ~/.ssh/id_rsa.pub
-```
+1. Download the eb_nerd dataset locally on your computer.
+2. Create the following folder: `RecSysGroup27/ebnerd_data`.
+3. Extract the dataset into the `ebnerd_data` folder. \
+The folder should contain the following datasets: \
+`ebnerd_data/ebnerd_demo` \
+`ebnerd_data/ebnerd_large` \
+`ebnerd_data/ebnerd_small` \
+`ebnerd_data/ebnerd_testset`
 
-Clone this repo
-```bash
-git@github.com:s204431/RecSysGroup27.git
-```
-
-Run the following command when you want to activate the enviroment
-```bash
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_rsa
-```
-
-Add enviroment
-```bash
-python -m venv ~/venv/RecSys
-```
-
-Activate enviroment
-```bash
-source ~/venv/RecSys/bin/activate
-```
-
-Update your enviroment (remember to be in RecSysGroup27 folder)
-```bash
-pip install -r requirements.txt
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
+Not all datasets are needed. ebnerd_large is only needed if you want to run on the large dataset and ebnerd_testset is only needed if you want to run on the test set. We recommend only using ebnerd_small and ebnerd_demo.

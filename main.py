@@ -31,17 +31,19 @@ validation_batch_size = 200     # The batch size for validation
 n_validation_batches = 50       # How many batches to run for each validation
 max_batches = 5000              # Use this if you want to end the training early
 
+with_time_embeddings = True
+
 def main():
-    model = NRMSExtended(nlp, h=h, dropout=dropout).to(DEVICE)
+    if with_time_embeddings:
+        model = NRMSExtended(nlp, h=h, dropout=dropout).to(DEVICE)
+    else:
+        model = NRMS(nlp, h=h, dropout=dropout).to(DEVICE)
 
     if load_model:
         model.load_state_dict(torch.load('model_best_nrms_30_20.pth', map_location=DEVICE))
-    
-    #Comment this out if you do not want to tune parameters
-    #tuneParameters(nlp, dataset_name, k, batch_size, num_epochs, validate_every, validation_batch_size, n_validation_batches, max_batches)
 
     #with torch.no_grad(): #Test on whole validation set
-        #testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp)
+        #testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp, batch_size=validation_batch_size, with_time_embeddings=with_time_embeddings)
 
     if not testing:
         train(
@@ -59,12 +61,13 @@ def main():
             validate_every=validate_every,
             validation_batch_size=validation_batch_size,
             n_validation_batches=n_validation_batches,
-            max_batches=max_batches
+            max_batches=max_batches,
+            with_time_embeddings=with_time_embeddings
             )
 
     else:
         with torch.no_grad():
-            runOnTestSet(model, history_size, max_title_size, nlp)
+            runOnTestSet(model, history_size, max_title_size, nlp, batch_size=validation_batch_size, with_time_embeddings=with_time_embeddings)
 
 
 if __name__ == '__main__':

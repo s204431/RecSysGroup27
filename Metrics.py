@@ -1,7 +1,4 @@
 import torch
-import time
-
-
 
 def calculate_auc(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     """

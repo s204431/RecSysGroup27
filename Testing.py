@@ -2,7 +2,6 @@ from Dataloading import ArticlesDatasetTest
 from Utils import sampleIndices, sampleHistory, replace_titles_with_tokens, pad_token_list, findMaxInviewInBatchTesting, convertOutput
 import torch
 from torch.utils.data import DataLoader
-from NRMS import NRMS
 import scipy.stats as ss
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -76,12 +75,11 @@ def make_batch(batch, dataset, nlp, k, history_size, max_title_size):
     batch_inview_times = torch.tensor(batch_inview_times).to(DEVICE)
     return batch_history, batch_targets, batch_history_times, batch_inview_times
 
-def runOnTestSet(model, history_size, max_title_size, nlp):
-    log_every = 50
-    batch_size = 200
+def runOnTestSet(model, history_size, max_title_size, nlp, batch_size, with_time_embeddings):
+    log_every = 10000//batch_size
 
     model.eval()
-    test_dataset = ArticlesDatasetTest('ebnerd_testset', nlp)
+    test_dataset = ArticlesDatasetTest('ebnerd_demo', nlp)
     validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
     outputs = []
     iteration = 0
@@ -89,7 +87,10 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
     for batch in validation_loader:
         k_batch = findMaxInviewInBatchTesting(batch)
         batch_history, batch_targets, batch_history_times, batch_inview_times = make_batch(batch, test_dataset, nlp, k_batch, history_size, max_title_size)
-        batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_history_times.float(), inview_times=batch_inview_times.float())
+        if with_time_embeddings:
+            batch_outputs = model(history=batch_history, targets=batch_targets, history_times=batch_history_times.float(), inview_times=batch_inview_times.float())
+        else:
+            batch_outputs = model(history=batch_history, targets=batch_targets)
         batch_outputs = batch_outputs.cpu().numpy()
         batch_outputs = convertOutput(batch_outputs, batch)
         
@@ -101,6 +102,6 @@ def runOnTestSet(model, history_size, max_title_size, nlp):
         iteration += 1
 
         if iteration % log_every == 0:
-                print("Finished: ", len(outputs))
+                print("Finished: " + str(len(outputs)) + "/" + str(len(test_dataset)))
                 
     saveToFile(outputs)
