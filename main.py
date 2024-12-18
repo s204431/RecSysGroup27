@@ -40,7 +40,7 @@ def main():
         model = NRMS(nlp, h=h, dropout=dropout).to(DEVICE)
 
     if load_model:
-        model.load_state_dict(torch.load('model_best_nrms_30_20.pth', map_location=DEVICE))
+        model.load_state_dict(torch.load('model_best.pth', map_location=DEVICE))
 
     #with torch.no_grad(): #Test on whole validation set
         #testOnWholeDataset(model, "ebnerd_small", "validation", history_size, max_title_size, nlp, batch_size=validation_batch_size, with_time_embeddings=with_time_embeddings)
@@ -62,7 +62,8 @@ def main():
             validation_batch_size=validation_batch_size,
             n_validation_batches=n_validation_batches,
             max_batches=max_batches,
-            with_time_embeddings=with_time_embeddings
+            with_time_embeddings=with_time_embeddings,
+            plot_results=False
             )
 
     else:

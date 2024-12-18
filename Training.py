@@ -119,7 +119,8 @@ def train(
         validation_batch_size=200,
         n_validation_batches=50,
         max_batches=50000,
-        with_time_embeddings=True
+        with_time_embeddings=True,
+        plot_results=True
         ):
     
     train_dataset = ArticlesDatasetTraining(dataset_name, 'train', nlp)
@@ -217,14 +218,15 @@ def train(
                 train_outputs = []
                 train_gt_positions = []
 
-                # Plot results
-                plt.clf()   # Clears current figure
-                plt.subplot(1, 2, 1)
-                plt.plot(iterations, train_aucs_overall, label='train_AUC_scores')
-                plt.plot(iterations, val_aucs_overall, label='valid_AUC_scores')
-                plt.legend()
-                plt.show()
-                clear_output(wait=True)
+                if plot_results:
+                    # Plot results
+                    plt.clf()   # Clears current figure
+                    plt.subplot(1, 2, 1)
+                    plt.plot(iterations, train_aucs_overall, label='train_AUC_scores')
+                    plt.plot(iterations, val_aucs_overall, label='valid_AUC_scores')
+                    plt.legend()
+                    plt.show()
+                    clear_output(wait=True)
 
                 model.train()
             if n_batches_finished >= max_batches:

@@ -79,7 +79,7 @@ def runOnTestSet(model, history_size, max_title_size, nlp, batch_size, with_time
     log_every = 10000//batch_size
 
     model.eval()
-    test_dataset = ArticlesDatasetTest('ebnerd_demo', nlp)
+    test_dataset = ArticlesDatasetTest('ebnerd_testset', nlp)
     validation_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=list)
     outputs = []
     iteration = 0

@@ -15,3 +15,6 @@ The folder should contain the following datasets: \
 `ebnerd_data/ebnerd_testset`
 
 Not all datasets are needed. ebnerd_large is only needed if you want to run on the large dataset and ebnerd_testset is only needed if you want to run on the test set. We recommend only using ebnerd_small and ebnerd_demo.
+
+
+Link to GitHub repository: https://github.com/s204431/RecSysGroup27
